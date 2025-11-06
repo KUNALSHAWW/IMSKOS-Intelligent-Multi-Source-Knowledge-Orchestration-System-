@@ -11,7 +11,7 @@ torch>=2.0.0
 sentence-transformers==2.5.1
 
 # Optional vector DB (uncomment if required and verified)
-# cassio==0.1.4
+cassio==0.1.4
 
 # Document processing
 tiktoken==0.6.0
