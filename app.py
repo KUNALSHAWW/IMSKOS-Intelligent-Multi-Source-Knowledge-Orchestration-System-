@@ -14,6 +14,46 @@ An enterprise-grade, production-ready intelligent query routing system that leve
 import streamlit as st
 import os
 from typing import List, Dict, Any
+
+# Compatibility shim for different typing.ForwardRef._evaluate signatures
+# ------------------------------------------------------------
+# Some Python/typing/pydantic versions expect ForwardRef._evaluate to accept
+# recursive_guard as a keyword-only argument, while other versions accept it
+# positionally. When a third-party library calls ForwardRef._evaluate using the
+# older calling convention, it can raise:
+#   TypeError: ForwardRef._evaluate() missing 1 required keyword-only argument: 'recursive_guard'
+#
+# This shim wraps/monkeypatches typing.ForwardRef._evaluate so it accepts both
+# calling conventions. It should be safe and only applied at import time.
+try:
+    from typing import ForwardRef as _ForwardRef
+
+    _orig_forwardref_evaluate = getattr(_ForwardRef, "_evaluate", None)
+    if _orig_forwardref_evaluate is not None:
+        def _evaluate_compat(self, globalns, localns, *args, **kwargs):
+            """
+            Compatibility wrapper that attempts to call the original _evaluate
+            with whatever args/kwargs were passed. If a TypeError occurs (typical
+            when the underlying implementation requires recursive_guard as
+            keyword-only), call the original with recursive_guard provided as a
+            keyword using the first positional arg if available or an empty set.
+            """
+            try:
+                return _orig_forwardref_evaluate(self, globalns, localns, *args, **kwargs)
+            except TypeError:
+                # Older callers passed recursive_guard positionally; newer
+                # implementations require recursive_guard as a keyword-only arg.
+                recursive_guard = args[0] if args else set()
+                return _orig_forwardref_evaluate(self, globalns, localns, recursive_guard=recursive_guard)
+
+        # Monkeypatch the ForwardRef implementation with the compatibility wrapper
+        _ForwardRef._evaluate = _evaluate_compat
+except Exception:
+    # If anything goes wrong here, do not prevent app import — let original
+    # behavior surface later (so the original error will be visible).
+    pass
+# ------------------------------------------------------------
+
 import cassio
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader
