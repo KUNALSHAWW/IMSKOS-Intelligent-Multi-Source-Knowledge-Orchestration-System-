@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+.venv/
+
+# Streamlit / IDE
+.streamlit/
+.vscode/
+
+# Secrets and credentials
+.env
+*.json
+cs23b1039@iiitr.ac.in-token.json
+*.sqlite
+.DS_Store
+
+# Logs
+*.log
