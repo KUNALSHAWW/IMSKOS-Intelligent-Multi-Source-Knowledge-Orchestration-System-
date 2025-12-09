@@ -1,15 +1,3 @@
----
-title: IMSKOS - Intelligent Knowledge Orchestration
-emoji: 🧠
-colorFrom: purple
-colorTo: blue
-sdk: streamlit
-sdk_version: 1.31.0
-app_file: app.py
-pinned: false
-license: mit
-short_description: Advanced Agentic RAG with LangGraph & Adaptive Query Routing
----
 
 # 🧠 IMSKOS - Intelligent Multi-Source Knowledge Orchestration System
 
