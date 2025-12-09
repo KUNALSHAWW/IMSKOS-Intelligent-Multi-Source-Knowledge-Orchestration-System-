@@ -1,9 +1,23 @@
+---
+title: IMSKOS - Intelligent Knowledge Orchestration
+emoji: 🧠
+colorFrom: purple
+colorTo: blue
+sdk: streamlit
+sdk_version: 1.31.0
+app_file: app.py
+pinned: false
+license: mit
+short_description: Advanced Agentic RAG with LangGraph & Adaptive Query Routing
+---
+
 # 🧠 IMSKOS - Intelligent Multi-Source Knowledge Orchestration System
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![LangChain](https://img.shields.io/badge/LangChain-🦜-green.svg)](https://langchain.com/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-🔗-orange.svg)](https://github.com/langchain-ai/langgraph)
 [![Streamlit](https://img.shields.io/badge/Streamlit-🎈-red.svg)](https://streamlit.io/)
+[![HuggingFace](https://img.shields.io/badge/🤗%20Hugging%20Face-Spaces-yellow.svg)](https://huggingface.co/spaces)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > **Enterprise-Grade Agentic RAG Framework with Adaptive Query Routing**

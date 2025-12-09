@@ -1,0 +1,36 @@
+# ==================== Docker Compose ====================
+# IMSKOS - Intelligent Multi-Source Knowledge Orchestration System
+# Docker Compose configuration for local development and deployment
+
+version: '3.8'
+
+services:
+  imskos:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: imskos-app
+    ports:
+      - "8501:8501"
+    environment:
+      - ASTRA_DB_APPLICATION_TOKEN=${ASTRA_DB_APPLICATION_TOKEN}
+      - ASTRA_DB_ID=${ASTRA_DB_ID}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      # Mount for development (optional, remove for production)
+      - ./app.py:/app/app.py:ro
+    networks:
+      - imskos-network
+
+networks:
+  imskos-network:
+    driver: bridge

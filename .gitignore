@@ -6,17 +6,61 @@ __pycache__/
 env/
 venv/
 .venv/
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
 # Streamlit / IDE
-.streamlit/
+.streamlit/secrets.toml
 .vscode/
 
 # Secrets and credentials
 .env
 *.json
+!package.json
 cs23b1039@iiitr.ac.in-token.json
 *.sqlite
 .DS_Store
 
 # Logs
 *.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker
+.docker/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Model files (large)
+*.h5
+*.pkl
+*.pt
+*.pth
+
+# OS generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

@@ -13,7 +13,15 @@ An enterprise-grade, production-ready intelligent query routing system that leve
 
 import streamlit as st
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Set USER_AGENT to suppress warnings from web loaders
+if not os.getenv("USER_AGENT"):
+    os.environ["USER_AGENT"] = "IMSKOS/1.0 (Intelligent Multi-Source Knowledge Orchestration System)"
 
 # Compatibility shim for different typing.ForwardRef._evaluate signatures
 # ------------------------------------------------------------
@@ -64,6 +72,8 @@ from langchain_community.tools import WikipediaQueryRun
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 from langchain_core.documents import Document
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
 from langgraph.graph import END, StateGraph, START
 from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
@@ -71,6 +81,7 @@ from typing import Literal
 import time
 import json
 from datetime import datetime
+import traceback
 
 # Page Configuration
 st.set_page_config(
@@ -153,18 +164,44 @@ class Config:
     
     @staticmethod
     def load_env_variables():
-        """Load and validate environment variables"""
+        """Load and validate environment variables from multiple sources
+        
+        Priority order:
+        1. Streamlit secrets (for Streamlit Cloud / HuggingFace Spaces)
+        2. Environment variables (for local development / Docker)
+        """
+        
+        def get_secret(key: str) -> Optional[str]:
+            """Get secret from Streamlit secrets or environment variables"""
+            # First check Streamlit secrets (works on HuggingFace Spaces)
+            try:
+                if hasattr(st, 'secrets') and key in st.secrets:
+                    return st.secrets[key]
+            except Exception:
+                pass
+            # Fall back to environment variables
+            return os.getenv(key)
+        
         required_vars = {
-            "ASTRA_DB_APPLICATION_TOKEN": os.getenv("ASTRA_DB_APPLICATION_TOKEN"),
-            "ASTRA_DB_ID": os.getenv("ASTRA_DB_ID"),
-            "GROQ_API_KEY": os.getenv("GROQ_API_KEY")
+            "ASTRA_DB_APPLICATION_TOKEN": get_secret("ASTRA_DB_APPLICATION_TOKEN"),
+            "ASTRA_DB_ID": get_secret("ASTRA_DB_ID"),
+            "GROQ_API_KEY": get_secret("GROQ_API_KEY")
         }
         
         missing_vars = [key for key, value in required_vars.items() if not value]
         
         if missing_vars:
             st.error(f"⚠️ Missing environment variables: {', '.join(missing_vars)}")
-            st.info("Please set these in your .env file or Streamlit secrets")
+            st.info("""
+            **Setup Instructions:**
+            1. **Local Development:** Create a `.env` file with your credentials
+            2. **Streamlit Cloud:** Add secrets in the app settings
+            
+            Required variables:
+            - `ASTRA_DB_APPLICATION_TOKEN` - Get from [DataStax Astra](https://astra.datastax.com)
+            - `ASTRA_DB_ID` - Your Astra DB database ID
+            - `GROQ_API_KEY` - Get from [Groq Console](https://console.groq.com)
+            """)
             st.stop()
         
         return required_vars
@@ -192,6 +229,7 @@ class GraphState(TypedDict):
     question: str
     generation: str
     documents: List[str]
+    route: str
 
 # ==================== Core System Classes ====================
 
@@ -264,6 +302,7 @@ class IntelligentRouter:
         self.groq_api_key = groq_api_key
         self.llm = None
         self.question_router = None
+        self.generation_chain = None
         
     def initialize(self):
         """Set up LLM and routing chain"""
@@ -294,18 +333,50 @@ Be precise in your routing decisions."""
         ])
         
         self.question_router = route_prompt | structured_llm
+        
+        # Set up generation chain for synthesizing answers
+        generation_prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are a helpful AI assistant specialized in providing accurate, informative answers.
+            
+Use the following retrieved context to answer the user's question. 
+If the context doesn't contain relevant information, say so and provide general guidance.
+Be concise but comprehensive. Use bullet points for clarity when appropriate.
+
+Context:
+{context}"""),
+            ("human", "{question}")
+        ])
+        
+        self.generation_chain = generation_prompt | self.llm | StrOutputParser()
     
     def route(self, question: str) -> str:
         """Route question to appropriate data source"""
         result = self.question_router.invoke({"question": question})
         return result.datasource
+    
+    def generate_response(self, question: str, documents: List[Document]) -> str:
+        """Generate a coherent response from retrieved documents"""
+        # Format documents into context string
+        if isinstance(documents, list):
+            context = "\n\n".join([
+                f"Document {i+1}:\n{doc.page_content}" 
+                for i, doc in enumerate(documents[:5])
+            ])
+        else:
+            context = documents.page_content if hasattr(documents, 'page_content') else str(documents)
+        
+        response = self.generation_chain.invoke({
+            "context": context,
+            "question": question
+        })
+        return response
 
 class AdaptiveRAGWorkflow:
     """LangGraph-based adaptive retrieval workflow"""
     
-    def __init__(self, vector_store, question_router):
+    def __init__(self, vector_store, router: IntelligentRouter):
         self.vector_store = vector_store
-        self.question_router = question_router
+        self.router = router
         self.retriever = vector_store.as_retriever(search_kwargs={"k": 4})
         self.wiki = self._setup_wikipedia()
         self.workflow = None
@@ -314,8 +385,8 @@ class AdaptiveRAGWorkflow:
     def _setup_wikipedia(self):
         """Initialize Wikipedia search tool"""
         api_wrapper = WikipediaAPIWrapper(
-            top_k_results=1,
-            doc_content_chars_max=500
+            top_k_results=2,
+            doc_content_chars_max=1000
         )
         return WikipediaQueryRun(api_wrapper=api_wrapper)
     
@@ -323,19 +394,37 @@ class AdaptiveRAGWorkflow:
         """Retrieve from vector store"""
         question = state["question"]
         documents = self.retriever.invoke(question)
-        return {"documents": documents, "question": question}
+        return {"documents": documents, "question": question, "route": "vectorstore"}
     
     def wiki_search(self, state: Dict) -> Dict:
         """Search Wikipedia"""
         question = state["question"]
-        docs = self.wiki.invoke({"query": question})
-        wiki_results = Document(page_content=docs)
-        return {"documents": wiki_results, "question": question}
+        try:
+            docs = self.wiki.invoke({"query": question})
+            wiki_results = Document(page_content=docs)
+        except Exception as e:
+            wiki_results = Document(page_content=f"Wikipedia search returned no results for this query. Error: {str(e)}")
+        return {"documents": [wiki_results], "question": question, "route": "wikipedia"}
+    
+    def generate(self, state: Dict) -> Dict:
+        """Generate response from retrieved documents"""
+        question = state["question"]
+        documents = state["documents"]
+        
+        # Use the router's generation chain to create a response
+        generation = self.router.generate_response(question, documents)
+        
+        return {
+            "question": question,
+            "documents": documents,
+            "generation": generation,
+            "route": state.get("route", "unknown")
+        }
     
     def route_question(self, state: Dict) -> str:
         """Route based on question type"""
         question = state["question"]
-        source = self.question_router.route(question)
+        source = self.router.route(question)
         
         if source == "wiki_search":
             return "wiki_search"
@@ -349,8 +438,9 @@ class AdaptiveRAGWorkflow:
         # Add nodes
         workflow.add_node("wiki_search", self.wiki_search)
         workflow.add_node("retrieve", self.retrieve)
+        workflow.add_node("generate", self.generate)
         
-        # Add conditional edges
+        # Add conditional edges from START
         workflow.add_conditional_edges(
             START,
             self.route_question,
@@ -360,8 +450,12 @@ class AdaptiveRAGWorkflow:
             },
         )
         
-        workflow.add_edge("retrieve", END)
-        workflow.add_edge("wiki_search", END)
+        # Both retrieval paths lead to generation
+        workflow.add_edge("retrieve", "generate")
+        workflow.add_edge("wiki_search", "generate")
+        
+        # Generation leads to END
+        workflow.add_edge("generate", END)
         
         self.app = workflow.compile()
         
@@ -372,15 +466,25 @@ class AdaptiveRAGWorkflow:
         result = {
             "route": None,
             "documents": [],
+            "generation": "",
             "execution_time": 0
         }
         
         start_time = time.time()
         
-        for output in self.app.stream(inputs):
-            for key, value in output.items():
-                result["route"] = key
-                result["documents"] = value.get("documents", [])
+        try:
+            for output in self.app.stream(inputs):
+                for key, value in output.items():
+                    if key == "generate":
+                        result["generation"] = value.get("generation", "")
+                        result["route"] = value.get("route", "unknown")
+                        result["documents"] = value.get("documents", [])
+                    elif key in ["retrieve", "wiki_search"]:
+                        result["route"] = value.get("route", key)
+                        result["documents"] = value.get("documents", [])
+        except Exception as e:
+            result["generation"] = f"Error executing query: {str(e)}"
+            result["route"] = "error"
         
         result["execution_time"] = time.time() - start_time
         
@@ -615,9 +719,9 @@ def render_query_tab():
                 
                 # Routing information
                 route = result["route"]
-                route_class = "route-vector" if route == "retrieve" else "route-wiki"
-                route_emoji = "🗄️" if route == "retrieve" else "📖"
-                route_name = "Vector Store" if route == "retrieve" else "Wikipedia"
+                route_class = "route-vector" if route == "vectorstore" else "route-wiki"
+                route_emoji = "🗄️" if route == "vectorstore" else "📖"
+                route_name = "Vector Store" if route == "vectorstore" else "Wikipedia"
                 
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -629,22 +733,37 @@ def render_query_tab():
                 with col2:
                     st.metric("⚡ Execution Time", f"{result['execution_time']:.2f}s")
                 with col3:
-                    st.metric("📄 Documents", len(result['documents']) if isinstance(result['documents'], list) else 1)
+                    num_docs = len(result['documents']) if isinstance(result['documents'], list) else 1
+                    st.metric("📄 Documents", num_docs)
                 
-                # Display documents
-                st.markdown("### 📄 Retrieved Information")
+                # Display AI-generated response
+                st.markdown("### 🤖 AI-Generated Answer")
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); 
+                            padding: 1.5rem; border-radius: 10px; margin: 1rem 0;
+                            border-left: 4px solid #667eea;">
+                    {result['generation']}
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Display source documents in expandable section
+                st.markdown("### 📄 Source Documents")
                 
                 documents = result['documents']
-                if isinstance(documents, list):
+                if isinstance(documents, list) and documents:
                     for i, doc in enumerate(documents[:5], 1):
-                        with st.expander(f"📌 Document {i}", expanded=(i == 1)):
-                            st.markdown(doc.page_content)
+                        with st.expander(f"📌 Source Document {i}", expanded=False):
+                            if hasattr(doc, 'page_content'):
+                                st.markdown(doc.page_content)
+                            else:
+                                st.markdown(str(doc))
                             
-                            if advanced_mode and hasattr(doc, 'metadata'):
+                            if advanced_mode and hasattr(doc, 'metadata') and doc.metadata:
                                 st.markdown("**Metadata:**")
                                 st.json(doc.metadata)
-                else:
-                    st.markdown(documents.page_content)
+                elif hasattr(documents, 'page_content'):
+                    with st.expander("📌 Source Document", expanded=False):
+                        st.markdown(documents.page_content)
                 
                 # Store query history
                 if 'query_history' not in st.session_state:
@@ -654,11 +773,14 @@ def render_query_tab():
                     "query": query,
                     "route": route_name,
                     "timestamp": datetime.now().strftime("%H:%M:%S"),
-                    "execution_time": result['execution_time']
+                    "execution_time": result['execution_time'],
+                    "response_preview": result['generation'][:100] + "..." if len(result['generation']) > 100 else result['generation']
                 })
                 
             except Exception as e:
                 st.error(f"❌ Query execution failed: {str(e)}")
+                if st.checkbox("Show error details"):
+                    st.code(traceback.format_exc())
 
 def render_analytics_tab():
     """Render system analytics and monitoring"""
