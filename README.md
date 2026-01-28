@@ -1,18 +1,4 @@
 
-# 🧠 IMSKOS - Intelligent Multi-Source Knowledge Orchestration System
-
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![LangChain](https://img.shields.io/badge/LangChain-🦜-green.svg)](https://langchain.com/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-🔗-orange.svg)](https://github.com/langchain-ai/langgraph)
-[![Streamlit](https://img.shields.io/badge/Streamlit-🎈-red.svg)](https://streamlit.io/)
-[![HuggingFace](https://img.shields.io/badge/🤗%20Hugging%20Face-Spaces-yellow.svg)](https://huggingface.co/spaces)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-> **Enterprise-Grade Agentic RAG Framework with Adaptive Query Routing**
-
-An advanced production-ready system that intelligently orchestrates knowledge retrieval from multiple sources using state-of-the-art LangGraph workflows, distributed vector storage with DataStax Astra DB, and high-performance LLM inference via Groq.
-
----
 
 ## 🎯 Project Overview
 
@@ -385,3 +371,6 @@ If you find this project useful, please consider giving it a ⭐!
 *Elevating Information Retrieval to Intelligence*
 
 </div>
+
+
+
