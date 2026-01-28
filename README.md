@@ -366,9 +366,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Contact & Support
 
-- **GitHub Issues**: [Report bugs or request features](https://github.com/yourusername/IMSKOS/issues)
-- **Email**: your.email@example.com
-- **LinkedIn**: [Your Profile](https://linkedin.com/in/yourprofile)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/KUNALSHAWW/IMSKOS/issues)
+- **Email**: kunalshawkol17@gmail.com
+- **LinkedIn**: [Profile](https://www.linkedin.com/in/kunal-kumar-shaw-443999205/)
 
 ---
 
