@@ -99,7 +99,7 @@ An advanced production-ready system that intelligently orchestrates knowledge re
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/yourusername/IMSKOS.git
+git clone https://github.com/KUNALSHAWW/IMSKOS.git
 cd IMSKOS
 ```
 
