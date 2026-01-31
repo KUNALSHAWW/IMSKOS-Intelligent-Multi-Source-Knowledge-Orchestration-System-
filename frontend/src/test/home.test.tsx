@@ -49,7 +49,9 @@ describe("Home Page", () => {
 
   it("renders the IMSKOS title", () => {
     renderWithProviders(<Home />);
-    expect(screen.getByText("IMSKOS — Demo")).toBeInTheDocument();
+    // New UI has "IMSKOS" in both header and footer
+    const imskosElements = screen.getAllByText("IMSKOS");
+    expect(imskosElements.length).toBeGreaterThan(0);
   });
 
   it("renders the query input textarea", () => {
@@ -101,12 +103,12 @@ describe("Home Page", () => {
       expect(screen.getByText(mockQueryResponse.response)).toBeInTheDocument();
     });
     
-    // Check that sources are displayed
-    expect(screen.getByText("Sources")).toBeInTheDocument();
+    // Check that sources are displayed - new UI says "Retrieved Sources"
+    expect(screen.getByText("Retrieved Sources")).toBeInTheDocument();
     expect(screen.getByText(/92% match/)).toBeInTheDocument();
     
-    // Check metrics
-    expect(screen.getByText("75ms")).toBeInTheDocument();
+    // Check metrics - new UI shows number without "ms" suffix (it's in the label)
+    expect(screen.getByText("75")).toBeInTheDocument();
   });
 
   it("displays error when query fails", async () => {
@@ -119,9 +121,10 @@ describe("Home Page", () => {
     
     const button = screen.getByLabelText("Execute query");
     fireEvent.click(button);
-    
+
+    // New UI shows "Query Failed" instead of "Error:"
     await waitFor(() => {
-      expect(screen.getByText(/Error:/)).toBeInTheDocument();
+      expect(screen.getByText("Query Failed")).toBeInTheDocument();
     });
   });
 
