@@ -1,75 +1,110 @@
 
 
+<div align="center">
+
+# 🧠 IMSKOS
+
+### Intelligent Multi-Source Knowledge Orchestration System
+
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/KUNALSHAWW/IMSKOS)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docker-compose.dev.yml)
+
+*Production-quality RAG system with adaptive query routing, vector store retrieval, and multi-source knowledge fusion.*
+
+[Quick Start](#-quick-start) • [Architecture](#-system-architecture) • [API Reference](#-api-reference) • [Contributing](#-contributing)
+
+</div>
+
+---
+
 ## 🎯 Project Overview
 
-**IMSKOS** represents a paradigm shift in intelligent information retrieval by combining:
+**IMSKOS v1.1** is a production-ready RAG (Retrieval-Augmented Generation) system featuring:
 
-- **🔄 Adaptive Query Routing**: LLM-powered decision engine that dynamically routes queries to optimal data sources
+- **🔄 Adaptive Query Routing**: LLM-powered routing to optimal data sources (Groq with fallback heuristics)
 - **🗄️ Distributed Vector Storage**: Scalable DataStax Astra DB for production-grade vector operations
 - **⚡ High-Performance Inference**: Groq's lightning-fast LLM API for sub-second responses
 - **🔗 Stateful Workflows**: LangGraph for complex, multi-step retrieval orchestration
-- **🎨 Modern UI/UX**: Professional Streamlit interface with real-time analytics
+- **🎨 Modern UI/UX**: Next.js + TypeScript frontend with shadcn/ui components
+- **🛡️ Production Ready**: Docker, CI/CD, comprehensive testing, graceful mock mode
 
 ---
 
 ## 🏗️ System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     User Query Interface                     │
-│                      (Streamlit App)                         │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Intelligent Query Router (Groq LLM)             │
-│          Analyzes query → Determines optimal source          │
-└──────────────┬────────────────────────────┬─────────────────┘
-               │                            │
-               ▼                            ▼
-┌──────────────────────────┐  ┌──────────────────────────────┐
-│   Vector Store Retrieval │  │   Wikipedia External Search   │
-│   (Astra DB + Cassandra) │  │   (LangChain Wikipedia Tool)  │
-│   - AI/ML Content        │  │   - General Knowledge         │
-│   - Technical Docs       │  │   - Current Events            │
-└──────────────┬───────────┘  └──────────────┬───────────────┘
-               │                              │
-               └──────────────┬───────────────┘
-                              ▼
-                    ┌─────────────────────┐
-                    │   LangGraph Workflow│
-                    │   State Management  │
-                    │   Result Aggregation│
-                    └──────────┬──────────┘
-                               ▼
-                    ┌─────────────────────┐
-                    │  Formatted Response │
-                    │  + Analytics        │
-                    └─────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              IMSKOS v1.1 Architecture                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           Frontend (Next.js + TypeScript)                     │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │ Query Page  │  │Index Page   │  │ Docs Page   │  │  Analytics Page     │  │
+│  │ - Prompt    │  │ - Upload    │  │ - List      │  │  - Charts           │  │
+│  │ - Streaming │  │ - Progress  │  │ - Delete    │  │  - Metrics          │  │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+└───────────────────────────────────┬──────────────────────────────────────────┘
+                                    │ HTTP/SSE
+                                    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           Backend (FastAPI + Python)                          │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                         API Layer (/api/v1)                             │  │
+│  │  POST /query  │  POST /upload  │  GET /docs  │  POST /feedback        │  │
+│  └─────────────────────────────────┬──────────────────────────────────────┘  │
+│                                    │                                          │
+│  ┌────────────────────┐  ┌────────────────────┐  ┌────────────────────────┐  │
+│  │  Query Router      │  │  Indexing Pipeline │  │  Auth & Sessions       │  │
+│  │  - Groq LLM        │  │  - PDF/DOCX/Images │  │  - Supabase Auth       │  │
+│  │  - Fallback Rules  │  │  - Chunking        │  │  - JWT Validation      │  │
+│  │  - HyDE/Multi-Q    │  │  - Embeddings      │  │  - RBAC                │  │
+│  └─────────┬──────────┘  └─────────┬──────────┘  └────────────────────────┘  │
+│            │                       │                                          │
+└────────────┼───────────────────────┼──────────────────────────────────────────┘
+             │                       │
+             ▼                       ▼
+┌────────────────────────┐  ┌────────────────────────┐  ┌────────────────────┐
+│   Vector Store         │  │   Job Queue            │  │   Storage          │
+│   (Astra DB)           │  │   (Redis + RQ)         │  │   (Supabase/S3)    │
+│   - Semantic Search    │  │   - Async Processing   │  │   - File Storage   │
+│   - Embeddings         │  │   - Progress Tracking  │  │   - Metadata       │
+└────────────────────────┘  └────────────────────────┘  └────────────────────┘
 ```
 
 ---
 
-## ✨ Key Features
+## 📁 Folder Structure
 
-### 🎯 Intelligent Capabilities
-
-| Feature | Description | Technology |
-|---------|-------------|------------|
-| **Adaptive Routing** | Context-aware query routing to optimal data sources | Groq LLM + Pydantic |
-| **Semantic Search** | Deep semantic understanding with transformer embeddings | HuggingFace Embeddings |
-| **Multi-Source Fusion** | Seamless integration of proprietary and public knowledge | LangGraph |
-| **Real-time Analytics** | Query performance monitoring and routing statistics | Streamlit |
-| **Scalable Storage** | Distributed vector database with auto-scaling | DataStax Astra DB |
-
-### 🔧 Technical Highlights
-
-- **🏛️ Production-Ready Architecture**: Modular design with separation of concerns
-- **🔐 Security-First**: Environment variable management, no hardcoded credentials
-- **📊 Observable**: Built-in analytics dashboard and query history
-- **🚀 Performance Optimized**: Caching, efficient document chunking, parallel processing
-- **🎨 Professional UI**: Modern, responsive interface with custom CSS styling
-- **📈 Scalable**: Handles growing document collections without performance degradation
+```
+IMSKOS/
+├── frontend/                    # Next.js + TypeScript application
+│   ├── src/
+│   │   ├── app/                 # App Router pages
+│   │   ├── components/          # React components
+│   │   │   └── ui/              # shadcn/ui components
+│   │   ├── lib/                 # Utilities and API client
+│   │   ├── types/               # TypeScript types
+│   │   └── test/                # Vitest tests
+│   ├── Dockerfile
+│   ├── package.json
+│   └── tsconfig.json
+│
+├── backend/                     # FastAPI + Python application
+│   ├── app/
+│   │   ├── api/                 # API routes
+│   │   │   └── v1/              # Version 1 endpoints
+│   │   ├── core/                # Config, settings
+│   │   └── models/              # Pydantic schemas
+│   ├── tests/                   # pytest tests
+│   ├── Dockerfile
+│   └── requirements.txt
+│
+├── docker-compose.dev.yml       # Development environment
+├── .env.example                 # Environment variables template
+└── README.md
+```
 
 ---
 
@@ -77,260 +112,194 @@
 
 ### Prerequisites
 
-- Python 3.9 or higher
-- DataStax Astra DB account ([Sign up free](https://astra.datastax.com))
-- Groq API key ([Get API key](https://console.groq.com))
+- Docker & Docker Compose (recommended)
+- OR: Node.js 18+ and Python 3.10+
 
-### Installation
+### Option 1: Docker (Recommended)
 
-1. **Clone the repository:**
 ```bash
+# 1. Clone the repository
 git clone https://github.com/KUNALSHAWW/IMSKOS-Intelligent-Multi-Source-Knowledge-Orchestration-System-.git
-cd IMSKOS
-```
+cd IMSKOS-Intelligent-Multi-Source-Knowledge-Orchestration-System-
 
-2. **Create virtual environment:**
-```bash
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# Linux/Mac
-source venv/bin/activate
-```
-
-3. **Install dependencies:**
-```bash
-pip install -r requirements.txt
-```
-
-4. **Configure environment variables:**
-```bash
-# Copy example file
+# 2. Copy environment file
 cp .env.example .env
 
-# Edit .env with your credentials
-# ASTRA_DB_APPLICATION_TOKEN=your_token_here
-# ASTRA_DB_ID=your_database_id_here
-# GROQ_API_KEY=your_groq_api_key_here
+# 3. Start all services (runs in MOCK MODE if keys missing)
+docker-compose -f docker-compose.dev.yml up --build
+
+# 4. Access the application
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8000/docs
 ```
 
-5. **Run the application:**
+### Option 2: Local Development
+
+**Backend:**
 ```bash
-streamlit run app.py
+cd backend
+python -m venv venv
+.\venv\Scripts\activate  # Windows
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
 ```
 
-6. **Access the application:**
-Open your browser and navigate to `http://localhost:8501`
-
----
-
-## 📚 Usage Guide
-
-### Step 1: Index Your Knowledge Base
-
-1. Navigate to the **"Knowledge Base Indexing"** tab
-2. Add URLs of documents you want to index (default includes AI/ML research papers)
-3. Click **"Index Documents"** to process and store in Astra DB
-4. Wait for the indexing process to complete (progress shown in real-time)
-
-### Step 2: Execute Intelligent Queries
-
-1. Switch to the **"Intelligent Query"** tab
-2. Enter your question in the text input
-3. Click **"Execute Query"**
-4. The system will:
-   - Analyze your query
-   - Route to optimal data source (Vector Store or Wikipedia)
-   - Retrieve relevant information
-   - Display results with metadata
-
-### Step 3: Monitor Performance
-
-1. Visit the **"Analytics"** tab to see:
-   - Total queries executed
-   - Routing distribution (Vector Store vs Wikipedia)
-   - Average execution time
-   - Complete query history
-
----
-
-## 🎓 Example Queries
-
-### Vector Store Queries (Routed to Astra DB)
-```
-✅ "What are the types of agent memory?"
-✅ "Explain chain of thought prompting techniques"
-✅ "How do adversarial attacks work on large language models?"
-✅ "What is ReAct prompting?"
-```
-
-### Wikipedia Queries (Routed to External Search)
-```
-✅ "Who is Elon Musk?"
-✅ "What is quantum computing?"
-✅ "Tell me about the Marvel Avengers"
-✅ "History of artificial intelligence"
-```
-
----
-
-## 🏢 Production Deployment
-
-### Deploying to Streamlit Cloud
-
-1. **Push to GitHub:**
+**Frontend:**
 ```bash
-git init
-git add .
-git commit -m "Initial commit: IMSKOS production deployment"
-git branch -M main
-git remote add origin https://github.com/yourusername/IMSKOS.git
-git push -u origin main
+cd frontend
+npm install
+npm run dev
 ```
 
-2. **Configure Streamlit Cloud:**
-   - Go to [share.streamlit.io](https://share.streamlit.io)
-   - Click "New app"
-   - Select your repository
-   - Set main file: `app.py`
-   - Add secrets in "Advanced settings":
-     ```toml
-     ASTRA_DB_APPLICATION_TOKEN = "your_token"
-     ASTRA_DB_ID = "your_database_id"
-     GROQ_API_KEY = "your_groq_key"
-     ```
+---
 
-3. **Deploy!**
+## 🔌 API Reference
 
-### Alternative Deployment Options
+### Core Endpoints
 
-#### Docker Deployment
-```dockerfile
-# Dockerfile
-FROM python:3.9-slim
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/query` | Execute intelligent query |
+| `POST` | `/api/v1/upload` | Upload file for indexing |
+| `POST` | `/api/v1/index` | Trigger indexing job |
+| `GET` | `/api/v1/index/{job_id}` | Get indexing job status |
+| `GET` | `/api/v1/docs` | List indexed documents |
+| `DELETE` | `/api/v1/docs/{doc_id}` | Delete document (admin) |
+| `POST` | `/api/v1/feedback` | Submit query feedback |
+| `GET` | `/health` | Health check |
 
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+### Query Request Example
 
-COPY . .
-
-EXPOSE 8501
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+```json
+POST /api/v1/query
+{
+  "query": "What are the types of agent memory?",
+  "user_id": "user-123",
+  "source": "auto",
+  "options": {
+    "top_k": 5,
+    "temperature": 0.0,
+    "hyde": false
+  }
+}
 ```
 
+### Query Response Example
+
+```json
+{
+  "id": "query-abc123",
+  "response": "Agent memory can be categorized into...",
+  "sources": [
+    {
+      "source_id": "doc-1",
+      "similarity_score": 0.92,
+      "snippet": "Agent memory systems include...",
+      "url": "/storage/docs/doc1.pdf"
+    }
+  ],
+  "metrics": {
+    "elapsed_ms": 245,
+    "tokens": 156,
+    "embedding_ms": 45,
+    "retrieval_ms": 120,
+    "llm_ms": 80
+  },
+  "routing_reason": "Routed to vector store: query contains technical AI terminology"
+}
+```
+
+---
+
+## 🔄 Mock Mode
+
+IMSKOS runs in **MOCK MODE** when API keys are missing, enabling local development without external services.
+
+| Missing Variable | Mock Behavior |
+|------------------|---------------|
+| `GROQ_API_KEY` | Deterministic heuristic routing |
+| `ASTRA_DB_*` | In-memory vector store |
+| `SUPABASE_*` | Local filesystem + SQLite |
+| `HUGGINGFACE_API_KEY` | Local sentence-transformers |
+
+Check `/health` endpoint to see mock mode status:
+
+```json
+{
+  "status": "healthy",
+  "version": "1.1.0",
+  "mock_mode": {
+    "supabase": true,
+    "astra_db": true,
+    "groq": true
+  }
+}
+```
+
+---
+
+## ⚙️ Environment Variables
+
+See [.env.example](.env.example) for the complete list. Key variables:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GROQ_API_KEY` | No* | Groq LLM API key |
+| `ASTRA_DB_APPLICATION_TOKEN` | No* | Astra DB token |
+| `ASTRA_DB_ID` | No* | Astra DB database ID |
+| `SUPABASE_URL` | No* | Supabase project URL |
+| `SUPABASE_ANON_KEY` | No* | Supabase anonymous key |
+| `JWT_SECRET` | Yes | JWT signing secret |
+
+*\* System runs in MOCK MODE if missing*
+
+---
+
+## 🧪 Testing
+
+**Backend:**
 ```bash
-# Build and run
-docker build -t imskos .
-docker run -p 8501:8501 --env-file .env imskos
+cd backend
+pytest -v
 ```
 
-#### AWS/GCP/Azure Deployment
-See detailed deployment guides in the `/docs` folder (coming soon).
-
----
-
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `ASTRA_DB_APPLICATION_TOKEN` | DataStax Astra DB token | Yes | - |
-| `ASTRA_DB_ID` | Astra DB instance ID | Yes | - |
-| `GROQ_API_KEY` | Groq API authentication key | Yes | - |
-
-### Customization Options
-
-**Modify document chunking:**
-```python
-# In app.py - KnowledgeBaseManager.load_and_process_documents()
-text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-    chunk_size=500,  # Adjust chunk size
-    chunk_overlap=50  # Adjust overlap
-)
+**Frontend:**
+```bash
+cd frontend
+npm test          # Vitest unit tests
+npm run test:e2e  # Playwright E2E tests
 ```
-
-**Change embedding model:**
-```python
-# In app.py - KnowledgeBaseManager.setup_embeddings()
-self.embeddings = HuggingFaceEmbeddings(
-    model_name="all-MiniLM-L6-v2"  # Try: "all-mpnet-base-v2" for higher quality
-)
-```
-
-**Adjust LLM parameters:**
-```python
-# In app.py - IntelligentRouter.initialize()
-self.llm = ChatGroq(
-    model_name="llama-3.1-8b-instant",  # Try other Groq models
-    temperature=0  # Increase for more creative responses
-)
-```
-
----
-
-## 📊 Performance Benchmarks
-
-| Metric | Value | Notes |
-|--------|-------|-------|
-| **Query Latency** | < 2s | Average end-to-end response time |
-| **Embedding Generation** | ~100ms | Per document chunk |
-| **Vector Search** | < 500ms | Top-K retrieval from Astra DB |
-| **LLM Routing** | < 300ms | Groq inference time |
-| **Concurrent Users** | 50+ | Tested on Streamlit Cloud |
-
----
-
-## 🛠️ Technology Stack
-
-### Core Framework
-- **[Streamlit](https://streamlit.io/)** - Interactive web application framework
-- **[LangChain](https://langchain.com/)** - LLM application framework
-- **[LangGraph](https://github.com/langchain-ai/langgraph)** - Stateful workflow orchestration
-
-### AI/ML Components
-- **[Groq](https://groq.com/)** - High-performance LLM inference
-- **[HuggingFace Transformers](https://huggingface.co/)** - Sentence embeddings
-- **[DataStax Astra DB](https://astra.datastax.com)** - Vector database
-
-### Supporting Libraries
-- **Pydantic** - Data validation and settings management
-- **BeautifulSoup4** - Web scraping and HTML parsing
-- **TikToken** - Token counting and text splitting
-- **Wikipedia API** - External knowledge retrieval
 
 ---
 
 ## 📈 Roadmap
 
-### Version 1.1 (Planned)
-- [ ] Multi-modal support (images, PDFs)
-- [ ] Advanced RAG techniques (HyDE, Multi-Query)
-- [ ] Custom document upload via UI
-- [ ] Export results to PDF/Markdown
-- [ ] User authentication & session management
+### v1.1 (Current)
+- [x] Next.js + TypeScript frontend
+- [x] FastAPI backend with mock mode
+- [x] Docker development environment
+- [ ] Document upload & indexing
+- [ ] SSE streaming responses
+- [ ] Supabase auth integration
 
-### Version 2.0 (Future)
-- [ ] Multi-language support
+### v2.0 (Planned)
+- [ ] Multi-modal support (images, PDFs)
+- [ ] Advanced RAG (HyDE, Multi-Query)
 - [ ] Graph RAG integration
-- [ ] Real-time collaborative features
-- [ ] API endpoints for programmatic access
-- [ ] Advanced analytics dashboard
+- [ ] Real-time collaboration
+- [ ] Public API endpoints
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please follow these steps:
-
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
+2. Create a feature branch (`git checkout -b feat/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feat/amazing-feature`)
 5. Open a Pull Request
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ---
 
@@ -340,33 +309,17 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 🙏 Acknowledgments
-
-- LangChain team for the amazing framework
-- DataStax for Astra DB and Cassandra support
-- Groq for lightning-fast LLM inference
-- HuggingFace for open-source embeddings
-- Streamlit for the intuitive app framework
-
----
-
 ## 📞 Contact & Support
 
 - **GitHub Issues**: [Report bugs or request features](https://github.com/KUNALSHAWW/IMSKOS/issues)
 - **Email**: kunalshawkol17@gmail.com
-- **LinkedIn**: [Profile](https://www.linkedin.com/in/kunal-kumar-shaw-443999205/)
-
----
-
-## 🌟 Star History
-
-If you find this project useful, please consider giving it a ⭐!
+- **LinkedIn**: [Kunal Kumar Shaw](https://www.linkedin.com/in/kunal-kumar-shaw-443999205/)
 
 ---
 
 <div align="center">
 
-**Built with ❤️ using LangGraph, Astra DB, and Groq**
+**Built with ❤️ using Next.js, FastAPI, LangGraph, Astra DB, and Groq**
 
 *Elevating Information Retrieval to Intelligence*
 

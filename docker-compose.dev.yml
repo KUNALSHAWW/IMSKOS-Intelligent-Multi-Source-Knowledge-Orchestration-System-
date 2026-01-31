@@ -1,0 +1,104 @@
+# IMSKOS Development Docker Compose
+# Run: docker-compose -f docker-compose.dev.yml up --build
+
+services:
+  # ==========================================================================
+  # Backend API (FastAPI)
+  # ==========================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: imskos-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      # Supabase (optional - mock mode if missing)
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      # Astra DB (optional - mock mode if missing)
+      - ASTRA_DB_APPLICATION_TOKEN=${ASTRA_DB_APPLICATION_TOKEN:-}
+      - ASTRA_DB_ID=${ASTRA_DB_ID:-}
+      - ASTRA_DB_REGION=${ASTRA_DB_REGION:-}
+      # LLM Providers (optional - mock mode if missing)
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Redis
+      - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL:-redis://redis:6379}
+      - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN:-}
+      # Security
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-in-production}
+    volumes:
+      - ./backend:/app
+      - backend-storage:/app/storage
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - imskos-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Frontend (Next.js)
+  # ==========================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: imskos-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - imskos-network
+    restart: unless-stopped
+
+  # ==========================================================================
+  # Redis (Job Queue)
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: imskos-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - imskos-network
+    restart: unless-stopped
+
+# ==========================================================================
+# Volumes
+# ==========================================================================
+volumes:
+  backend-storage:
+    driver: local
+  redis-data:
+    driver: local
+
+# ==========================================================================
+# Networks
+# ==========================================================================
+networks:
+  imskos-network:
+    driver: bridge

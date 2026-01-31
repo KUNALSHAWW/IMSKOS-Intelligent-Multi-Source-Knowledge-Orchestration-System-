@@ -64,3 +64,40 @@ htmlcov/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# =============================================================================
+# Frontend (Next.js)
+# =============================================================================
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.pnp
+frontend/.pnp.js
+frontend/coverage/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.vercel
+frontend/playwright-report/
+frontend/test-results/
+
+# =============================================================================
+# Backend (FastAPI)
+# =============================================================================
+backend/__pycache__/
+backend/*.pyc
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+backend/storage/
+backend/.env
+
+# =============================================================================
+# Docker
+# =============================================================================
+.docker/
+docker-compose.override.yml
