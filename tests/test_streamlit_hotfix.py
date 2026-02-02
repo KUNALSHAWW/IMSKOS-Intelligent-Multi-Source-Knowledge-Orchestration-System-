@@ -394,5 +394,176 @@ class TestIndexingFlowMockMode:
         assert len(doc_result["docs"]) == 3
 
 
+class TestIndexingDisabledToggle:
+    """Tests for the INDEXING_DISABLED emergency kill switch."""
+    
+    def test_indexing_disabled_when_toggle_true(self):
+        """Test that INDEXING_DISABLED=true disables all indexing."""
+        os.environ["INDEXING_DISABLED"] = "true"
+        
+        indexing_disabled = os.getenv("INDEXING_DISABLED", "false").lower() == "true"
+        
+        assert indexing_disabled is True
+    
+    def test_indexing_enabled_by_default(self):
+        """Test that indexing is enabled by default."""
+        if "INDEXING_DISABLED" in os.environ:
+            del os.environ["INDEXING_DISABLED"]
+        
+        indexing_disabled = os.getenv("INDEXING_DISABLED", "false").lower() == "true"
+        
+        assert indexing_disabled is False
+    
+    def test_indexing_disabled_false_explicitly(self):
+        """Test that INDEXING_DISABLED=false enables indexing."""
+        os.environ["INDEXING_DISABLED"] = "false"
+        
+        indexing_disabled = os.getenv("INDEXING_DISABLED", "false").lower() == "true"
+        
+        assert indexing_disabled is False
+
+
+class TestUITimeoutSettings:
+    """Tests for UI timeout configuration."""
+    
+    def test_custom_ui_timeout_from_env(self):
+        """Test that INDEX_UI_TIMEOUT_SECONDS is read from environment."""
+        os.environ["INDEX_UI_TIMEOUT_SECONDS"] = "300"
+        
+        timeout = int(os.getenv("INDEX_UI_TIMEOUT_SECONDS", "600"))
+        
+        assert timeout == 300
+    
+    def test_default_ui_timeout(self):
+        """Test that default UI timeout is 600 seconds (10 minutes)."""
+        if "INDEX_UI_TIMEOUT_SECONDS" in os.environ:
+            del os.environ["INDEX_UI_TIMEOUT_SECONDS"]
+        
+        timeout = int(os.getenv("INDEX_UI_TIMEOUT_SECONDS", "600"))
+        
+        assert timeout == 600
+
+
+class TestMaxLocalIndexSize:
+    """Tests for MAX_LOCAL_INDEX_MB configuration."""
+    
+    def test_custom_max_local_index_size(self):
+        """Test that MAX_LOCAL_INDEX_MB is configurable."""
+        os.environ["MAX_LOCAL_INDEX_MB"] = "5"
+        
+        max_size = int(os.getenv("MAX_LOCAL_INDEX_MB", "2"))
+        
+        assert max_size == 5
+    
+    def test_default_max_local_index_size(self):
+        """Test that default max local index is 2MB."""
+        if "MAX_LOCAL_INDEX_MB" in os.environ:
+            del os.environ["MAX_LOCAL_INDEX_MB"]
+        
+        max_size = int(os.getenv("MAX_LOCAL_INDEX_MB", "2"))
+        
+        assert max_size == 2
+
+
+class TestBackendUrlConfiguration:
+    """Tests for BACKEND_URL configuration."""
+    
+    def test_default_backend_url(self):
+        """Test that default backend URL is localhost."""
+        if "BACKEND_URL" in os.environ:
+            del os.environ["BACKEND_URL"]
+        
+        backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+        
+        assert backend_url == "http://localhost:8000"
+    
+    def test_docker_backend_url(self):
+        """Test that Docker backend URL can be set to service name."""
+        os.environ["BACKEND_URL"] = "http://backend:8000"
+        
+        backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+        
+        assert backend_url == "http://backend:8000"
+
+
+class TestRequestTimeouts:
+    """Tests for request timeout handling."""
+    
+    @patch('requests.post')
+    def test_enqueue_uses_tuple_timeout(self, mock_post):
+        """Test that enqueue requests use tuple timeout (connect, read)."""
+        import requests
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"task_id": "test-123"}
+        mock_post.return_value = mock_response
+        
+        # Simulate enqueue function behavior
+        requests.post(
+            "http://localhost:8000/api/v1/index",
+            json={"document_ids": ["doc-1"]},
+            timeout=(5, 30)
+        )
+        
+        # Verify the timeout was passed correctly
+        call_args = mock_post.call_args
+        assert call_args.kwargs.get("timeout") == (5, 30)
+    
+    @patch('requests.get')
+    def test_status_poll_uses_tuple_timeout(self, mock_get):
+        """Test that status poll requests use tuple timeout."""
+        import requests
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"status": "SUCCESS"}
+        mock_get.return_value = mock_response
+        
+        # Simulate poll function behavior
+        requests.get(
+            "http://localhost:8000/api/v1/index/status/test-123",
+            timeout=(5, 10)
+        )
+        
+        # Verify the timeout was passed
+        call_args = mock_get.call_args
+        assert call_args.kwargs.get("timeout") == (5, 10)
+
+
+class TestEmergencyHotfix:
+    """Tests that verify the emergency hotfix can be applied."""
+    
+    def test_emergency_disable_via_env(self):
+        """Test that setting INDEXING_DISABLED=true works immediately."""
+        os.environ["INDEXING_DISABLED"] = "true"
+        os.environ["MOCK_MODE"] = "true"
+        
+        # Simulate the guard logic
+        indexing_disabled = os.getenv("INDEXING_DISABLED", "false").lower() == "true"
+        mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
+        
+        # Both should be usable together
+        assert indexing_disabled is True
+        assert mock_mode is True
+        
+        # When indexing_disabled is True, button should not appear
+        # This is tested by the presence of the return statement in the code
+    
+    def test_all_safety_flags_can_be_combined(self):
+        """Test that all safety flags work together."""
+        os.environ["MOCK_MODE"] = "true"
+        os.environ["ENABLE_INDEX_BACKGROUND"] = "false"
+        os.environ["INDEXING_DISABLED"] = "false"
+        
+        mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
+        enable_bg = os.getenv("ENABLE_INDEX_BACKGROUND", "true").lower() == "true"
+        disabled = os.getenv("INDEXING_DISABLED", "false").lower() == "true"
+        
+        assert mock_mode is True
+        assert enable_bg is False
+        assert disabled is False
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

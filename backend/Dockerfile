@@ -18,12 +18,20 @@ COPY . .
 # Create storage directory for mock mode
 RUN mkdir -p /app/storage
 
+# Create non-root user for security
+RUN groupadd --gid 1000 appgroup && \
+    useradd --uid 1000 --gid appgroup --shell /bin/bash --create-home appuser && \
+    chown -R appuser:appgroup /app
+
 # Expose port
 EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
+
+# Switch to non-root user
+USER appuser
 
 # Run the application
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

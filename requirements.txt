@@ -1,3 +1,7 @@
+# ==================== IMSKOS - Hugging Face Spaces ====================
+# Intelligent Multi-Source Knowledge Orchestration System
+# Compatible with Hugging Face Spaces deployment
+
 # ==================== Core Framework ====================
 streamlit>=1.31.0,<2.0.0
 python-dotenv>=1.0.0
@@ -27,6 +31,7 @@ wikipedia>=1.4.0
 # ==================== Data & Utilities ====================
 pandas>=2.2.1
 pydantic>=2.6.4
+pydantic-settings>=2.0.0
 typing-extensions>=4.10.0
 
 # ==================== HTTP & Networking ====================

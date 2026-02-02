@@ -1,5 +1,5 @@
 """
-� IMSKOS - Intelligent Multi-Source Knowledge Orchestration System
+🧠 IMSKOS - Intelligent Multi-Source Knowledge Orchestration System
 ===================================================================
 🚀 Advanced Agentic RAG Framework with Dynamic Routing & Distributed Vector Storage
 
@@ -62,7 +62,12 @@ if not os.getenv("USER_AGENT"):
 # =============================================================================
 MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() == "true"
 ENABLE_INDEX_BACKGROUND = os.getenv("ENABLE_INDEX_BACKGROUND", "true").lower() == "true"
+# INDEXING_DISABLED is an emergency kill switch - when true, the button is completely hidden
+INDEXING_DISABLED = os.getenv("INDEXING_DISABLED", "false").lower() == "true"
 ASTRA_CONNECT_TIMEOUT = int(os.getenv("ASTRA_CONNECT_TIMEOUT", "30"))
+INDEX_UI_TIMEOUT_SECONDS = int(os.getenv("INDEX_UI_TIMEOUT_SECONDS", "600"))
+MAX_LOCAL_INDEX_MB = int(os.getenv("MAX_LOCAL_INDEX_MB", "2"))
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
 # Required environment variables for full functionality
 REQUIRED_ENV_VARS = {
@@ -116,6 +121,7 @@ from pydantic import BaseModel, Field
 from typing import Literal
 import time
 import json
+import html
 from datetime import datetime
 import traceback
 import requests
@@ -754,12 +760,25 @@ def safe_load_and_process_documents(kb_manager, urls: List[str], progress_callba
         }
 
 
-def run_indexing_with_timeout(func, *args, timeout_seconds: int = 30, **kwargs) -> dict:
+def run_indexing_with_timeout(func, *args, timeout_seconds: int = 30, stop_event=None, **kwargs) -> dict:
     """
-    HOTFIX: Run a function in a thread with timeout.
+    HOTFIX: Run a function in a thread with timeout and cooperative cancellation.
     Prevents Streamlit main thread from blocking indefinitely.
+    
+    Args:
+        func: Function to execute (should check stop_event.is_set() periodically if provided)
+        timeout_seconds: Maximum time to wait
+        stop_event: Optional threading.Event for cooperative cancellation
+        
     Returns dict with 'success', 'result' or 'error'/'timeout'.
+    
+    NOTE: Target functions should poll stop_event.is_set() and clean up resources when set.
     """
+    import threading
+    
+    if stop_event is None:
+        stop_event = threading.Event()
+    
     _executor = ThreadPoolExecutor(max_workers=1)
     
     try:
@@ -767,11 +786,18 @@ def run_indexing_with_timeout(func, *args, timeout_seconds: int = 30, **kwargs) 
         result = future.result(timeout=timeout_seconds)
         return {"success": True, "result": result, "timeout": False}
     except FuturesTimeoutError:
-        logging.warning(f"HOTFIX: Operation timed out after {timeout_seconds}s")
+        # Signal cooperative cancellation
+        stop_event.set()
+        
+        # Attempt to cancel the future
+        cancelled = future.cancel()
+        logging.warning(f"HOTFIX: Operation timed out after {timeout_seconds}s. Cancel attempted: {cancelled}")
+        
         return {
             "success": False,
             "timeout": True,
-            "error": f"Operation timed out after {timeout_seconds} seconds"
+            "error": f"Operation timed out after {timeout_seconds} seconds",
+            "cancel_attempted": cancelled
         }
     except Exception as e:
         error_trace = traceback.format_exc()
@@ -792,17 +818,15 @@ def enqueue_indexing_to_backend(document_ids: List[str], urls: List[str] = None)
     Returns dict with 'success', 'task_id' or 'error'.
     Falls back gracefully if backend unavailable.
     """
-    backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
-    
     try:
         payload = {"document_ids": document_ids}
         if urls:
             payload["urls"] = urls
         
         response = requests.post(
-            f"{backend_url}/api/v1/index",
+            f"{BACKEND_URL}/api/v1/index",
             json=payload,
-            timeout=10  # Short timeout for enqueue
+            timeout=(5, 30)  # (connect timeout, read timeout)
         )
         
         if response.status_code == 200:
@@ -830,8 +854,6 @@ def poll_indexing_status(task_id: str) -> dict:
     HOTFIX: Poll backend for indexing task status.
     Returns dict with task state and progress info.
     """
-    backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
-    
     # Handle mock task IDs
     if task_id.startswith("mock-"):
         return {
@@ -843,8 +865,8 @@ def poll_indexing_status(task_id: str) -> dict:
     
     try:
         response = requests.get(
-            f"{backend_url}/api/v1/index/status/{task_id}",
-            timeout=5
+            f"{BACKEND_URL}/api/v1/index/status/{task_id}",
+            timeout=(5, 10)  # (connect timeout, read timeout)
         )
         
         if response.status_code == 200:
@@ -924,9 +946,18 @@ class KnowledgeBaseManager:
                     # Clear any cached model state
                     torch.cuda.empty_cache() if torch.cuda.is_available() else None
                     
+                    # WARNING: Using fallback model with different embedding space
+                    fallback_model = "sentence-transformers/paraphrase-MiniLM-L6-v2"
+                    logging.warning(
+                        f"EMBEDDING MODEL FALLBACK: Primary model 'all-MiniLM-L6-v2' failed. "
+                        f"Falling back to '{fallback_model}'. "
+                        f"WARNING: These models produce different embedding spaces! "
+                        f"You should clear/re-index your vector store to avoid mixed embeddings."
+                    )
+                    
                     # Try with a different model that's more stable
                     self.embeddings = HuggingFaceEmbeddings(
-                        model_name="sentence-transformers/paraphrase-MiniLM-L6-v2",
+                        model_name=fallback_model,
                         model_kwargs=model_kwargs,
                         encode_kwargs=encode_kwargs
                     )
@@ -1372,9 +1403,10 @@ def initialize_system():
             progress_bar.progress(80)
             
             # Step 4: Store in session state (100%)
+            # NOTE: Only store initialized objects, NOT raw config with secrets
             st.session_state.kb_manager = kb_manager
             st.session_state.router = router
-            st.session_state.config = config
+            # Do not store: st.session_state.config = config (contains secrets)
             st.session_state.initialized = True
             st.session_state.documents_indexed = False
             st.session_state.db_connected = False
@@ -1508,14 +1540,25 @@ def render_indexing_tab():
     # HOTFIX: Show mock mode banner if applicable
     is_mock = show_mock_mode_banner()
     
+    # HOTFIX: Emergency kill switch - completely hide the button
+    if INDEXING_DISABLED:
+        st.error(
+            "🚨 **Indexing Disabled (Emergency)**\n\n"
+            "Document indexing has been disabled system-wide via `INDEXING_DISABLED=true`. "
+            "This is an emergency safety measure to prevent crashes. "
+            "Contact your administrator to investigate and re-enable."
+        )
+        st.info("💡 **Tip:** Set `INDEXING_DISABLED=false` in your environment to re-enable indexing.")
+        return
+    
     # HOTFIX: Show disabled banner if ENABLE_INDEX_BACKGROUND is false
     if not ENABLE_INDEX_BACKGROUND:
-        st.error(
-            "🚫 **Indexing Temporarily Disabled**\n\n"
-            "Document indexing is currently disabled via `ENABLE_INDEX_BACKGROUND=false`. "
-            "This is a temporary safety measure. Contact your administrator to re-enable."
+        st.warning(
+            "⚠️ **Background Indexing Disabled**\n\n"
+            "Background indexing is disabled via `ENABLE_INDEX_BACKGROUND=false`. "
+            "Only small documents (< " + str(MAX_LOCAL_INDEX_MB) + "MB) can be processed locally. "
+            "Set `ENABLE_INDEX_BACKGROUND=true` and ensure the backend worker is running for full functionality."
         )
-        return
     
     # Index button
     if st.button("🚀 Index Documents", type="primary", use_container_width=True):
@@ -1866,14 +1909,15 @@ def render_query_tab():
                     num_docs = len(result['documents']) if isinstance(result['documents'], list) else 1
                     st.metric("📄 Sources Found", num_docs)
                 
-                # AI Response
+                # AI Response - HTML escape to prevent XSS
+                safe_generation = html.escape(result['generation'])
                 st.markdown(f"""
                 <div class="response-container">
                     <div class="response-header">
                         <span>🤖</span> AI-Generated Response
                     </div>
                     <div class="response-text">
-                        {result['generation']}
+                        {safe_generation}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1890,13 +1934,15 @@ def render_query_tab():
                     for i, doc in enumerate(documents[:5], 1):
                         with st.expander(f"📌 Source {i}", expanded=False):
                             if hasattr(doc, 'page_content'):
+                                # HTML escape document content to prevent XSS
+                                safe_content = html.escape(doc.page_content[:500])
                                 st.markdown(f"""
                                 <div class="source-card">
-                                    {doc.page_content[:500]}{'...' if len(doc.page_content) > 500 else ''}
+                                    {safe_content}{'...' if len(doc.page_content) > 500 else ''}
                                 </div>
                                 """, unsafe_allow_html=True)
                             else:
-                                st.markdown(str(doc)[:500])
+                                st.markdown(html.escape(str(doc)[:500]))
                             
                             if advanced_mode and hasattr(doc, 'metadata') and doc.metadata:
                                 st.markdown("**Metadata:**")

@@ -121,15 +121,59 @@ class UploadResponse(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-class IndexRequest(BaseModel):
-    """Request model for POST /api/v1/index."""
-    file_id: str = Field(..., description="File ID to index")
+class IndexOptions(BaseModel):
+    """Options for document indexing."""
     chunk_size: int = Field(default=500, ge=100, le=2000, description="Chunk size in tokens")
     chunk_overlap: int = Field(default=50, ge=0, le=500, description="Chunk overlap in tokens")
 
 
+class IndexRequest(BaseModel):
+    """Request model for POST /api/v1/index."""
+    document_ids: list[str] = Field(..., description="List of document IDs to index")
+    urls: Optional[list[str]] = Field(default=None, description="Optional list of URLs to fetch documents from")
+    options: Optional[IndexOptions] = Field(default=None, description="Indexing options")
+    
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "document_ids": ["doc-1", "doc-2"],
+                    "urls": ["https://example.com/doc1.html"],
+                    "options": {"chunk_size": 500, "chunk_overlap": 50}
+                }
+            ]
+        }
+    }
+
+
+class IndexResponse(BaseModel):
+    """Response model for POST /api/v1/index - async task creation."""
+    task_id: str = Field(..., description="Background task identifier for polling")
+    status: str = Field(..., description="Initial task status (pending)")
+    message: str = Field(..., description="Human-readable status message")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class TaskStatusResponse(BaseModel):
+    """Response model for GET /api/v1/index/status/{task_id}."""
+    task_id: str = Field(..., description="Task identifier")
+    status: str = Field(..., description="Task status: PENDING, STARTED, PROGRESS, SUCCESS, FAILURE")
+    progress: Optional[dict] = Field(default=None, description="Progress info when status is PROGRESS")
+    result: Optional[dict] = Field(default=None, description="Result data when status is SUCCESS")
+    error: Optional[str] = Field(default=None, description="Error message when status is FAILURE")
+
+
+class IndexUploadResponse(BaseModel):
+    """Response model for POST /api/v1/index/upload."""
+    message: str = Field(..., description="Upload status message")
+    document_ids: list[str] = Field(..., description="Generated document IDs")
+    task_id: str = Field(..., description="Background indexing task ID")
+    status: str = Field(..., description="Task status")
+    files: list[dict] = Field(default_factory=list, description="Uploaded file details")
+
+
 class IndexJobResponse(BaseModel):
-    """Response model for indexing job status."""
+    """Response model for indexing job status (legacy)."""
     job_id: str = Field(..., description="Job identifier")
     status: JobStatus = Field(..., description="Current job status")
     percent: float = Field(default=0.0, ge=0.0, le=100.0, description="Progress percentage")

@@ -34,14 +34,28 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     
     # Storage
+    storage_path: str = "/app/storage"
     s3_endpoint: Optional[str] = None
     s3_access_key: Optional[str] = None
     s3_secret_key: Optional[str] = None
     s3_bucket: Optional[str] = None
     
-    # Redis
+    # Redis / Celery
+    redis_url: str = "redis://localhost:6379/0"
     upstash_redis_rest_url: Optional[str] = None
     upstash_redis_rest_token: Optional[str] = None
+    
+    # Task timeouts (seconds)
+    indexing_timeout: int = 600  # 10 minutes
+    query_timeout: int = 30
+    
+    # CORS settings
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:8501",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8501",
+    ]
     
     # Security
     jwt_secret: Optional[str] = None
@@ -65,7 +79,7 @@ class Settings(BaseSettings):
             "astra_db": not all([self.astra_db_application_token, self.astra_db_id]),
             "groq": not self.groq_api_key,
             "huggingface": not self.huggingface_api_key,
-            "redis": not all([self.upstash_redis_rest_url, self.upstash_redis_rest_token]),
+            "redis": not self.redis_url or self.redis_url == "redis://localhost:6379/0",
             "s3": not all([self.s3_endpoint, self.s3_access_key, self.s3_secret_key]),
         }
     
@@ -79,7 +93,7 @@ class Settings(BaseSettings):
             "astra_db": ["ASTRA_DB_APPLICATION_TOKEN", "ASTRA_DB_ID"],
             "groq": ["GROQ_API_KEY"],
             "huggingface": ["HUGGINGFACE_API_KEY"],
-            "redis": ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
+            "redis": ["REDIS_URL"],
             "s3": ["S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY"],
         }
         

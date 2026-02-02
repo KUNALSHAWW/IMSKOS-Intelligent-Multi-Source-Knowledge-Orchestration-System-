@@ -5,7 +5,10 @@ from app.models.schemas import (
     FeedbackRequest,
     HealthResponse,
     IndexJobResponse,
+    IndexOptions,
     IndexRequest,
+    IndexResponse,
+    IndexUploadResponse,
     JobStatus,
     QueryMetrics,
     QueryOptions,
@@ -13,6 +16,7 @@ from app.models.schemas import (
     QueryResponse,
     QuerySource,
     SourceResult,
+    TaskStatusResponse,
     UploadResponse,
 )
 
@@ -22,7 +26,10 @@ __all__ = [
     "FeedbackRequest",
     "HealthResponse",
     "IndexJobResponse",
+    "IndexOptions",
     "IndexRequest",
+    "IndexResponse",
+    "IndexUploadResponse",
     "JobStatus",
     "QueryMetrics",
     "QueryOptions",
@@ -30,5 +37,6 @@ __all__ = [
     "QueryResponse",
     "QuerySource",
     "SourceResult",
+    "TaskStatusResponse",
     "UploadResponse",
 ]

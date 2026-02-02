@@ -80,15 +80,17 @@ Check `/health` endpoint for mock mode status.
         lifespan=lifespan,
     )
     
-    # Configure CORS
+    # Configure CORS with configurable origins
+    cors_origins = settings.cors_origins if settings.cors_origins else [
+        "http://localhost:3000",
+        "http://localhost:8501",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8501",
+    ]
+    
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",  # Next.js dev
-            "http://localhost:8501",  # Streamlit
-            "http://127.0.0.1:3000",
-            "http://127.0.0.1:8501",
-        ],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

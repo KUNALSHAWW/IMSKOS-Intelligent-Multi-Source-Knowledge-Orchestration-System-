@@ -1,23 +1,33 @@
 [theme]
+# Modern Purple/Blue Gradient Theme
 primaryColor = "#667eea"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f0f2f6"
-textColor = "#262730"
+backgroundColor = "#0f0c29"
+secondaryBackgroundColor = "#1a1744"
+textColor = "#ffffff"
 font = "sans serif"
 
 [server]
 headless = true
 port = 8501
+enableCORS = true
+# XSRF protection enabled for security
+# Note: Client must send XSRF token from cookie in X-Xsrftoken header for POST requests
 enableXsrfProtection = true
 maxUploadSize = 50
+# For Hugging Face Spaces
+address = "0.0.0.0"
 
 [browser]
 gatherUsageStats = false
-serverAddress = "localhost"
+serverAddress = "0.0.0.0"
 
 [runner]
 magicEnabled = true
+fastReruns = true
 
 [client]
 showErrorDetails = true
-toolbarMode = "auto"
+toolbarMode = "minimal"
+
+[logger]
+level = "info"
