@@ -1006,15 +1006,45 @@ class KnowledgeBaseManager:
         )
         return self.vector_store
     
-    def add_documents(self, documents: List[Document], progress_callback=None):
-        """Add documents to vector store"""
-        if progress_callback:
-            progress_callback("Indexing documents in Astra DB...")
+    def add_documents(self, documents: List[Document], progress_callback=None, batch_size: int = 20):
+        """
+        Add documents to vector store in batches to prevent memory exhaustion.
         
-        self.vector_store.add_documents(documents)
+        Args:
+            documents: List of Document objects to index
+            progress_callback: Optional callback for progress updates
+            batch_size: Number of documents per batch (default: 20)
+        """
+        total_docs = len(documents)
+        
+        if total_docs == 0:
+            if progress_callback:
+                progress_callback("No documents to index")
+            return
         
         if progress_callback:
-            progress_callback(f"Successfully indexed {len(documents)} document chunks")
+            progress_callback(f"Indexing {total_docs} documents in batches of {batch_size}...")
+        
+        # Process in batches to prevent memory exhaustion
+        indexed_count = 0
+        for i in range(0, total_docs, batch_size):
+            batch = documents[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (total_docs + batch_size - 1) // batch_size
+            
+            if progress_callback:
+                progress_callback(f"Processing batch {batch_num}/{total_batches} ({indexed_count}/{total_docs} docs)...")
+            
+            # Add this batch to the vector store
+            self.vector_store.add_documents(batch)
+            indexed_count += len(batch)
+            
+            # Small delay between batches to allow GC and prevent resource exhaustion
+            if i + batch_size < total_docs:
+                time.sleep(0.1)
+        
+        if progress_callback:
+            progress_callback(f"Successfully indexed {indexed_count} document chunks")
 
 class IntelligentRouter:
     """LLM-powered query router"""
@@ -1574,6 +1604,95 @@ def render_indexing_tab():
         progress_bar = st.progress(0)
         status_text = st.empty()
         
+        # =================================================================
+        # HOTFIX: Check if background indexing is enabled
+        # =================================================================
+        if ENABLE_INDEX_BACKGROUND and not MOCK_MODE:
+            status_text.markdown("""
+            <div class="info-box">
+                <span style="margin-right: 0.5rem;">🔄</span> Queuing documents for background indexing...
+            </div>
+            """, unsafe_allow_html=True)
+            progress_bar.progress(10)
+            
+            # Generate document IDs from URLs
+            doc_ids = [f"url-{hash(url) % 100000}" for url in urls]
+            
+            # Try to enqueue to backend
+            enqueue_result = enqueue_indexing_to_backend(doc_ids, urls)
+            
+            if enqueue_result.get("success"):
+                task_id = enqueue_result.get("task_id", "unknown")
+                progress_bar.progress(30)
+                status_text.markdown(f"""
+                <div class="info-box">
+                    <span style="margin-right: 0.5rem;">✅</span> Task queued! ID: <code>{task_id}</code>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Poll for completion (max 60 seconds)
+                max_polls = 30
+                for poll_num in range(max_polls):
+                    time.sleep(2)
+                    poll_result = poll_indexing_status(task_id)
+                    
+                    if poll_result.get("success"):
+                        state = poll_result.get("status", poll_result.get("state", "PENDING"))
+                        progress_info = poll_result.get("progress", {})
+                        
+                        # Calculate progress percentage
+                        if isinstance(progress_info, dict):
+                            current = progress_info.get("current", 0)
+                            total = progress_info.get("total", 1)
+                            pct = min(30 + int((current / max(total, 1)) * 60), 90)
+                        else:
+                            pct = 30 + (poll_num * 2)
+                        
+                        progress_bar.progress(min(pct, 95))
+                        status_text.markdown(f"""
+                        <div class="info-box">
+                            <span style="margin-right: 0.5rem;">⏳</span> Status: {state} ({poll_num + 1}/{max_polls})
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        if state in ["SUCCESS", "FAILURE", "completed"]:
+                            break
+                    else:
+                        # Poll failed, continue anyway
+                        progress_bar.progress(30 + (poll_num * 2))
+                
+                progress_bar.progress(100)
+                status_text.empty()
+                
+                st.session_state.documents_indexed = True
+                st.session_state.index_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
+                st.markdown("""
+                <div class="success-box">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <span style="font-size: 1.5rem;">🎉</span>
+                        <strong>Background Indexing Complete!</strong>
+                    </div>
+                    <div style="color: rgba(255,255,255,0.8);">
+                        Documents have been queued and processed by the backend worker.
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                return
+            
+            elif enqueue_result.get("fallback"):
+                # Backend unavailable, fall back to local processing
+                status_text.markdown("""
+                <div class="warning-box">
+                    <span style="margin-right: 0.5rem;">⚠️</span> Backend unavailable, using local indexing...
+                </div>
+                """, unsafe_allow_html=True)
+                time.sleep(1)
+                # Continue to local indexing below
+            else:
+                st.error(f"❌ Failed to queue indexing: {enqueue_result.get('error')}")
+                return
+        
         def update_status(message, progress_pct):
             status_text.markdown(f"""
             <div class="info-box">
@@ -1661,29 +1780,55 @@ def render_indexing_tab():
                             st.code(traceback.format_exc(), language="python")
                         return
                 
-                # Step 4: Add documents with timeout protection
-                update_status("Generating embeddings and indexing...", 70)
+                # Step 4: Add documents with BATCHED processing to prevent memory exhaustion
+                total_docs = len(doc_splits)
+                batch_size = 20  # Process 20 documents at a time
+                total_batches = (total_docs + batch_size - 1) // batch_size
+                
+                update_status(f"Generating embeddings and indexing {total_docs} docs in {total_batches} batches...", 70)
+                
                 try:
-                    # Use threaded execution with timeout for embedding generation
-                    add_result = run_indexing_with_timeout(
-                        kb_manager.add_documents,
-                        doc_splits,
-                        lambda msg: None,
-                        timeout_seconds=120  # 2 minute timeout for adding docs
-                    )
-                    
-                    if not add_result.get("success"):
-                        if add_result.get("timeout"):
-                            st.warning(
-                                "⏱️ Embedding generation timed out. Try with fewer documents or use background mode."
-                            )
-                        else:
-                            st.error(f"❌ Failed to add documents: {add_result.get('error')}")
-                        if add_result.get("traceback"):
-                            with st.expander("🔍 Error Details"):
-                                st.code(add_result["traceback"], language="python")
-                        return
+                    indexed_count = 0
+                    for batch_idx in range(0, total_docs, batch_size):
+                        batch = doc_splits[batch_idx:batch_idx + batch_size]
+                        batch_num = (batch_idx // batch_size) + 1
                         
+                        # Calculate progress: 70% to 95% during batched indexing
+                        batch_progress = 70 + int((batch_idx / total_docs) * 25)
+                        update_status(
+                            f"Processing batch {batch_num}/{total_batches} ({indexed_count}/{total_docs} docs)...",
+                            batch_progress
+                        )
+                        
+                        # Use threaded execution with timeout for this batch
+                        add_result = run_indexing_with_timeout(
+                            kb_manager.vector_store.add_documents,
+                            batch,
+                            timeout_seconds=60  # 1 minute timeout per batch
+                        )
+                        
+                        if not add_result.get("success"):
+                            if add_result.get("timeout"):
+                                st.warning(
+                                    f"⏱️ Batch {batch_num} timed out. Indexed {indexed_count}/{total_docs} docs. "
+                                    "Try with fewer documents or use background mode."
+                                )
+                            else:
+                                st.error(f"❌ Batch {batch_num} failed: {add_result.get('error')}")
+                            if add_result.get("traceback"):
+                                with st.expander("🔍 Error Details"):
+                                    st.code(add_result["traceback"], language="python")
+                            # Continue with partial success - don't return
+                            break
+                        
+                        indexed_count += len(batch)
+                        
+                        # Small delay between batches to allow GC
+                        if batch_idx + batch_size < total_docs:
+                            time.sleep(0.2)
+                    
+                    update_status(f"Successfully indexed {indexed_count}/{total_docs} documents", 95)
+                    
                 except Exception as add_error:
                     logging.exception("HOTFIX: Document addition failed")
                     st.error(f"❌ Failed to index documents: {str(add_error)}")
