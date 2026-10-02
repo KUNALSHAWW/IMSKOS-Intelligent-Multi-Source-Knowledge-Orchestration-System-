@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "imskos"
+version = "2.0.0"
+description = "Agentic RAG that grades what it retrieves, verifies what it writes, and abstains when it cannot ground an answer"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Kunal Kumar Shaw" }]
+dependencies = [
+  "langgraph>=0.2",
+  "httpx>=0.27",
+  "numpy>=1.26",
+  "beautifulsoup4>=4.12",
+  "lxml>=5",
+  "pypdf>=4",
+  "pydantic>=2.6",
+]
+
+[project.optional-dependencies]
+embeddings = ["sentence-transformers>=2.5"]
+api = ["fastapi>=0.110", "uvicorn>=0.29"]
+app = ["streamlit>=1.35"]
+dev = ["pytest>=8", "ruff>=0.4", "fastapi>=0.110", "uvicorn>=0.29", "streamlit>=1.35"]
+
+[project.scripts]
+imskos = "imskos.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["imskos*"]
+
+[tool.setuptools.package-data]
+imskos = ["eval/data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501", "B008", "B905"]
