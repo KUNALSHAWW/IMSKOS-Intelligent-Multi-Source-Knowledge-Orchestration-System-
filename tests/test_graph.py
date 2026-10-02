@@ -16,13 +16,13 @@ def test_happy_path_cites_and_grounds():
     assert ans.route == "vectorstore" and ans.grounded and not ans.abstained
     assert ans.citations and ans.citations[0].title == "LLM Agents"
     assert "random projection trees" in ans.citations[0].quote
-    assert ans.llm_calls == 3 and ans.completion_tokens > 0
+    assert ans.llm_calls == 2 and ans.completion_tokens > 0   # grade + generate; routing is off by default
 
 
 def test_web_route_uses_fallback_and_cites_it():
     chunk = Chunk("w1", "Canberra is the capital city of Australia.", "https://en.wikipedia.org/wiki/Canberra", "Canberra")
     eng = make_engine(FakeLLM(fake_script(route="web", answer="Canberra is the capital city of Australia [1].")),
-                      web=lambda q: [chunk])
+                      web=lambda q: [chunk], router="evidence")
     ans = eng.ask("What is the capital of Australia?")
     assert nodes(ans) == ["route", "web", "generate", "verify"]
     assert ans.grounded and ans.citations[0].source.endswith("Canberra")
@@ -115,7 +115,7 @@ def test_empty_index_routes_to_vectorstore_and_abstains():
 
 
 def test_evidence_router_shows_the_llm_the_retrieved_excerpts():
-    eng = make_engine(FakeLLM(fake_script()))
+    eng = make_engine(FakeLLM(fake_script()), router="evidence")
     eng.ask("What does ANNOY use?")
     route_prompt = next(m[0]["content"] for m, _ in eng.llm.calls if "You route questions" in m[0]["content"])
     assert "random projection trees" in route_prompt

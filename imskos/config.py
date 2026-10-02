@@ -27,7 +27,7 @@ class Settings:
     chunk_overlap: int = 150
     max_rewrites: int = 2
     max_regenerations: int = 1
-    router: str = "evidence"                  # evidence | titles | none
+    router: str = "none"                      # none (retrieval first) | evidence | titles
     grade: bool = True                        # LLM relevance grading of retrieved passages
     verify: bool = True                       # deterministic grounding check after generation
     defense: bool = True                      # redact instruction-like sentences in retrieved text

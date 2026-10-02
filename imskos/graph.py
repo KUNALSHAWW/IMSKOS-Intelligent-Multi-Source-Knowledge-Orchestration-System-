@@ -233,7 +233,8 @@ class AgenticRAG:
                 yield "node", state["trace"][-1]
         u = state["usage"]
         yield "final", Answer(
-            question=question, text=state.get("answer", ABSTAIN_TEXT), route=state.get("route", ""),
+            question=question, text=state.get("answer", ABSTAIN_TEXT),
+            route="web" if state.get("web_used") else state.get("route", ""),
             abstained=bool(state.get("abstained")), grounded=bool(state.get("grounded")),
             support=float(state.get("support", 0.0)), citations=state.get("citations", []),
             trace=state["trace"], prompt_tokens=u["p"], completion_tokens=u["c"], llm_calls=u["calls"],

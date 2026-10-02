@@ -52,16 +52,18 @@ def _eval(a) -> None:
             print(f"{m:15s} hit@1 {v['hit@1']:.2f} hit@5 {v['hit@5']:.2f} mrr {v['mrr@10']:.3f} ndcg {v['ndcg@10']:.3f}")
 
     if a.suite in ("e2e", "injection", "all"):
-        base = Settings.from_env(provider=a.provider, model=a.model or "", store="local")
+        base = Settings.from_env(provider=a.provider, model=a.model or "", store="local", router=a.router)
         llm = make_client(base)
         print("LLM:", llm.name)
         if a.suite in ("e2e", "all"):
             sets = ["answerable", "unanswerable"]
-            b = e2e.run_config("baseline", e2e.build_engine(docs, llm, embedder, base, **e2e.BASELINE), sets)
-            f = e2e.run_config("full", e2e.build_engine(docs, llm, embedder, base), sets + ["web"])
-            _save(out, "e2e.json", {"llm": llm.name, "embedder": embedder.name, "corpus_sha256": fp,
-                                    "baseline": b, "full": f})
-            print(json.dumps({"baseline": b["summary"], "full": f["summary"]}, indent=2))
+            out_cfg: dict = {"llm": llm.name, "embedder": embedder.name, "corpus_sha256": fp, "router": a.router}
+            if a.configs == "both":
+                out_cfg["baseline"] = e2e.run_config("baseline", e2e.build_engine(docs, llm, embedder, base, **e2e.BASELINE), sets)
+            out_cfg["full"] = e2e.run_config("full", e2e.build_engine(docs, llm, embedder, base), sets + ["web"])
+            name = "e2e.json" if a.router == "evidence" else f"e2e_{a.router}.json"
+            _save(out, name, out_cfg)
+            print(json.dumps({k: v["summary"] for k, v in out_cfg.items() if isinstance(v, dict) and "summary" in v}, indent=2))
         if a.suite in ("injection", "all"):
             res = injection.run_injection(docs, llm, embedder, base)
             res.update(llm=llm.name, corpus_sha256=fp)
@@ -95,6 +97,8 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--provider", default="ollama", choices=["groq", "openai", "ollama"])
     sp.add_argument("--model", default="")
     sp.add_argument("--embedding-model", default=Settings().embedding_model)
+    sp.add_argument("--router", default="evidence", choices=["evidence", "titles", "none"])
+    sp.add_argument("--configs", default="both", choices=["both", "full"])
     sp.add_argument("--rerank-model", default="cross-encoder/ms-marco-MiniLM-L-6-v2")
     sp.add_argument("--corpus-cache", default="corpus_cache")
     sp.add_argument("--out", default="benchmarks/results")
