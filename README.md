@@ -1,376 +1,100 @@
+# IMSKOS
 
+**Intelligent Multi-Source Knowledge Orchestration System**: an agentic RAG pipeline built on LangGraph that retrieves with hybrid search, grades what it found, verifies what it wrote, and says "I don't know" when it cannot ground an answer.
 
-## 🎯 Project Overview
-
-**IMSKOS** represents a paradigm shift in intelligent information retrieval by combining:
-
-- **🔄 Adaptive Query Routing**: LLM-powered decision engine that dynamically routes queries to optimal data sources
-- **🗄️ Distributed Vector Storage**: Scalable DataStax Astra DB for production-grade vector operations
-- **⚡ High-Performance Inference**: Groq's lightning-fast LLM API for sub-second responses
-- **🔗 Stateful Workflows**: LangGraph for complex, multi-step retrieval orchestration
-- **🎨 Modern UI/UX**: Professional Streamlit interface with real-time analytics
-
----
-
-## 🏗️ System Architecture
+<p align="center"><img src="docs/screenshots/ask.png" alt="IMSKOS answering a question with a grounded, cited answer and a live agent trace" width="900"></p>
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     User Query Interface                     │
-│                      (Streamlit App)                         │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Intelligent Query Router (Groq LLM)             │
-│          Analyzes query → Determines optimal source          │
-└──────────────┬────────────────────────────┬─────────────────┘
-               │                            │
-               ▼                            ▼
-┌──────────────────────────┐  ┌──────────────────────────────┐
-│   Vector Store Retrieval │  │   Wikipedia External Search   │
-│   (Astra DB + Cassandra) │  │   (LangChain Wikipedia Tool)  │
-│   - AI/ML Content        │  │   - General Knowledge         │
-│   - Technical Docs       │  │   - Current Events            │
-└──────────────┬───────────┘  └──────────────┬───────────────┘
-               │                              │
-               └──────────────┬───────────────┘
-                              ▼
-                    ┌─────────────────────┐
-                    │   LangGraph Workflow│
-                    │   State Management  │
-                    │   Result Aggregation│
-                    └──────────┬──────────┘
-                               ▼
-                    ┌─────────────────────┐
-                    │  Formatted Response │
-                    │  + Analytics        │
-                    └─────────────────────┘
+question -> (route) -> retrieve -> grade --relevant--> generate -> verify --grounded--> answer + citations
+                          ^           |                   ^            |
+                          |           +--none relevant--> rewrite      +--not grounded--> regenerate once -> abstain
+                          +-------------------------------+
+                                       after 2 rewrites: Wikipedia fallback
 ```
 
----
+## What is measured
 
-## ✨ Key Features
+Everything below comes from `benchmarks/results/*.json`, produced by `python -m imskos eval all` with a local `gemma4:e4b` model on CPU and three Lilian Weng posts as the corpus (165 chunks). Full tables, caveats and the failures are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
-### 🎯 Intelligent Capabilities
+**Retrieval** (30 labelled questions, a chunk is relevant if it contains the gold phrase):
 
-| Feature | Description | Technology |
-|---------|-------------|------------|
-| **Adaptive Routing** | Context-aware query routing to optimal data sources | Groq LLM + Pydantic |
-| **Semantic Search** | Deep semantic understanding with transformer embeddings | HuggingFace Embeddings |
-| **Multi-Source Fusion** | Seamless integration of proprietary and public knowledge | LangGraph |
-| **Real-time Analytics** | Query performance monitoring and routing statistics | Streamlit |
-| **Scalable Storage** | Distributed vector database with auto-scaling | DataStax Astra DB |
+| Mode | hit@1 | hit@5 | MRR@10 | nDCG@10 |
+|---|---|---|---|---|
+| Dense (MiniLM) | 0.70 | 0.93 | 0.81 | 0.84 |
+| BM25 | 0.77 | 1.00 | 0.87 | 0.90 |
+| Hybrid (RRF) | 0.77 | 1.00 | 0.88 | 0.89 |
+| Hybrid + cross-encoder rerank | **0.97** | 1.00 | **0.98** | 0.98 |
 
-### 🔧 Technical Highlights
+**End to end** (30 answerable, 10 unanswerable, 10 general-knowledge questions):
 
-- **🏛️ Production-Ready Architecture**: Modular design with separation of concerns
-- **🔐 Security-First**: Environment variable management, no hardcoded credentials
-- **📊 Observable**: Built-in analytics dashboard and query history
-- **🚀 Performance Optimized**: Caching, efficient document chunking, parallel processing
-- **🎨 Professional UI**: Modern, responsive interface with custom CSS styling
-- **📈 Scalable**: Handles growing document collections without performance degradation
+| Configuration | Answered correctly | Abstained when unanswerable | Notes |
+|---|---|---|---|
+| Plain RAG (retrieve, generate) | **100%** | **100%** | no web fallback, cannot answer the general questions |
+| Agent, LLM router | 77% | 100% | 90% of general questions correct via Wikipedia |
+| Agent, retrieval first (default) | 80% | 90% | 80% of general questions correct via Wikipedia |
 
----
+**Read this before quoting the numbers.** On this model and corpus the plain pipeline is the most accurate one. The agent's value here is the Wikipedia fallback, which the baseline lacks, and its cost is a more conservative answerer: it abstains on 13 to 20% of questions the baseline answers correctly, because grading and grounding checks are strict. Differences of a few points are noise at this sample size (one question is 3.3 points), the default routing was chosen after seeing the first run, and the injection benchmark did not discriminate (see below). I would rather show that than a flattering chart.
 
-## 🚀 Quick Start
+## Features
 
-### Prerequisites
+- **Real LangGraph `StateGraph`** ([imskos/graph.py](imskos/graph.py)): route, retrieve, grade, rewrite, web, generate, verify, regenerate, abstain, with bounded loops and a per-node trace (name, milliseconds, details).
+- **Hybrid retrieval**: BM25 and dense search fused by reciprocal rank fusion, optional cross-encoder rerank (hit@1 rises from 0.77 to 0.97 on the benchmark, at about 2 s per query on CPU).
+- **Corrective RAG**: the LLM grades retrieved passages, weak queries are rewritten and retried, and Wikipedia is the last resort.
+- **Grounding check** ([imskos/support.py](imskos/support.py)): a deterministic, model-free test of every answer sentence against the passages. Numbers must match, invented citation markers are stripped, and the best-supporting sentence becomes the quote shown to the user.
+- **Abstention**: an ungrounded answer is regenerated once with feedback and then replaced by an explicit "I don't know based on the available sources."
+- **Indirect prompt-injection defence** ([imskos/sanitize.py](imskos/sanitize.py)): instruction-like sentences in retrieved text are removed before they reach any prompt. It redacted the attack sentence in 32 of 32 instruction-style runs and removed nothing from the benign corpus.
+- **Idempotent ingestion**: content-hash per source, so re-ingesting an unchanged page does nothing and a changed page replaces its old chunks. URL, PDF, HTML and text loaders.
+- **Pluggable stores**: local numpy + BM25 store, and DataStax Astra DB through its Data API (dense only; contract-tested against a mock, not run against a live database).
+- **Interfaces**: CLI, REST API with Server-Sent Events (`/ask/stream` emits one event per graph node), and a Streamlit app with a live agent trace.
+- **Evaluation harness** in the package: labelled questions with gold phrases that are checked against the live corpus, bootstrap confidence intervals, an injection suite, and a chunk-size sweep.
 
-- Python 3.9 or higher
-- DataStax Astra DB account ([Sign up free](https://astra.datastax.com))
-- Groq API key ([Get API key](https://console.groq.com))
+## Quick start
 
-### Installation
-
-1. **Clone the repository:**
 ```bash
-git clone https://github.com/KUNALSHAWW/IMSKOS-Intelligent-Multi-Source-Knowledge-Orchestration-System-.git
-cd IMSKOS
-```
-
-2. **Create virtual environment:**
-```bash
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# Linux/Mac
-source venv/bin/activate
-```
-
-3. **Install dependencies:**
-```bash
-pip install -r requirements.txt
-```
-
-4. **Configure environment variables:**
-```bash
-# Copy example file
-cp .env.example .env
-
-# Edit .env with your credentials
-# ASTRA_DB_APPLICATION_TOKEN=your_token_here
-# ASTRA_DB_ID=your_database_id_here
-# GROQ_API_KEY=your_groq_api_key_here
-```
-
-5. **Run the application:**
-```bash
+pip install -r requirements.txt && pip install -e .
+export GROQ_API_KEY=...                 # or: --provider ollama --model gemma4:e4b
+python -m imskos ingest https://lilianweng.github.io/posts/2023-06-23-agent/
+python -m imskos ask "What does ANNOY use as its core data structure?" --trace
 streamlit run app.py
 ```
 
-6. **Access the application:**
-Open your browser and navigate to `http://localhost:8501`
-
----
-
-## 📚 Usage Guide
-
-### Step 1: Index Your Knowledge Base
-
-1. Navigate to the **"Knowledge Base Indexing"** tab
-2. Add URLs of documents you want to index (default includes AI/ML research papers)
-3. Click **"Index Documents"** to process and store in Astra DB
-4. Wait for the indexing process to complete (progress shown in real-time)
-
-### Step 2: Execute Intelligent Queries
-
-1. Switch to the **"Intelligent Query"** tab
-2. Enter your question in the text input
-3. Click **"Execute Query"**
-4. The system will:
-   - Analyze your query
-   - Route to optimal data source (Vector Store or Wikipedia)
-   - Retrieve relevant information
-   - Display results with metadata
-
-### Step 3: Monitor Performance
-
-1. Visit the **"Analytics"** tab to see:
-   - Total queries executed
-   - Routing distribution (Vector Store vs Wikipedia)
-   - Average execution time
-   - Complete query history
-
----
-
-## 🎓 Example Queries
-
-### Vector Store Queries (Routed to Astra DB)
-```
-✅ "What are the types of agent memory?"
-✅ "Explain chain of thought prompting techniques"
-✅ "How do adversarial attacks work on large language models?"
-✅ "What is ReAct prompting?"
-```
-
-### Wikipedia Queries (Routed to External Search)
-```
-✅ "Who is Elon Musk?"
-✅ "What is quantum computing?"
-✅ "Tell me about the Marvel Avengers"
-✅ "History of artificial intelligence"
-```
-
----
-
-## 🏢 Production Deployment
-
-### Deploying to Streamlit Cloud
-
-1. **Push to GitHub:**
-```bash
-git init
-git add .
-git commit -m "Initial commit: IMSKOS production deployment"
-git branch -M main
-git remote add origin https://github.com/yourusername/IMSKOS.git
-git push -u origin main
-```
-
-2. **Configure Streamlit Cloud:**
-   - Go to [share.streamlit.io](https://share.streamlit.io)
-   - Click "New app"
-   - Select your repository
-   - Set main file: `app.py`
-   - Add secrets in "Advanced settings":
-     ```toml
-     ASTRA_DB_APPLICATION_TOKEN = "your_token"
-     ASTRA_DB_ID = "your_database_id"
-     GROQ_API_KEY = "your_groq_key"
-     ```
-
-3. **Deploy!**
-
-### Alternative Deployment Options
-
-#### Docker Deployment
-```dockerfile
-# Dockerfile
-FROM python:3.9-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-
-EXPOSE 8501
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
-```
+Reproduce the benchmarks:
 
 ```bash
-# Build and run
-docker build -t imskos .
-docker run -p 8501:8501 --env-file .env imskos
+make eval-retrieval                                  # no LLM needed
+make eval PROVIDER=ollama MODEL=gemma4:e4b           # retrieval + end to end + injection (takes hours on CPU)
 ```
 
-#### AWS/GCP/Azure Deployment
-See detailed deployment guides in the `/docs` folder (coming soon).
+## Screenshots
 
----
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/web_route.png" alt="General question answered through the Wikipedia fallback"><br><sub>A general question falls through to Wikipedia after the knowledge base has nothing relevant</sub></td>
+<td width="50%"><img src="docs/screenshots/benchmarks.png" alt="Benchmark tab"><br><sub>Benchmarks tab, rendered from the committed JSON</sub></td>
+</tr>
+</table>
 
-## 🔧 Configuration
+The interface is dark-first (near-black canvas, graphite surfaces, one indigo accent) in the style of modern developer tools. Screenshots are real runs against a local `gemma4:e4b` model.
 
-### Environment Variables
+## Honest limitations
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `ASTRA_DB_APPLICATION_TOKEN` | DataStax Astra DB token | Yes | - |
-| `ASTRA_DB_ID` | Astra DB instance ID | Yes | - |
-| `GROQ_API_KEY` | Groq API authentication key | Yes | - |
+- On the benchmark, plain RAG beat both agent configurations for in-corpus questions. The grading and verification layers are conservative with a small local model; a stronger model or a weaker retriever may change that, and I have not measured it.
+- The grounding check is lexical. It catches invented numbers and names, and it can pass a fluent sentence that reuses passage words with a different meaning (one unanswerable question was answered with an off-topic but passage-supported sentence).
+- The injection benchmark showed 0 successful attacks with the defence on **and off**, including content-poisoning variants, so it cannot show that the defence helps. The model resisted. The sanitiser is a heuristic filter, unit-tested, and its patterns were written with the attack phrasings in mind.
+- 30 answerable questions over three blog posts is a small corpus. Gold phrases were chosen by the author.
+- Latency was measured while other jobs shared the CPU and is not comparable across configurations.
+- Wikipedia fallback uses the search API and intro paragraphs only.
 
-### Customization Options
+## Layout
 
-**Modify document chunking:**
-```python
-# In app.py - KnowledgeBaseManager.load_and_process_documents()
-text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-    chunk_size=500,  # Adjust chunk size
-    chunk_overlap=50  # Adjust overlap
-)
+```
+imskos/       graph, retrieval, store, embeddings, loaders, grounding check, sanitiser, API, CLI
+  eval/       corpus loader, labelled questions, retrieval / end-to-end / injection runners
+app.py        Streamlit app
+tests/        62 tests (fake LLM and hash embedder, no network)
+docs/         ARCHITECTURE.md, BENCHMARKS.md
 ```
 
-**Change embedding model:**
-```python
-# In app.py - KnowledgeBaseManager.setup_embeddings()
-self.embeddings = HuggingFaceEmbeddings(
-    model_name="all-MiniLM-L6-v2"  # Try: "all-mpnet-base-v2" for higher quality
-)
-```
+## License
 
-**Adjust LLM parameters:**
-```python
-# In app.py - IntelligentRouter.initialize()
-self.llm = ChatGroq(
-    model_name="llama-3.1-8b-instant",  # Try other Groq models
-    temperature=0  # Increase for more creative responses
-)
-```
-
----
-
-## 📊 Performance Benchmarks
-
-| Metric | Value | Notes |
-|--------|-------|-------|
-| **Query Latency** | < 2s | Average end-to-end response time |
-| **Embedding Generation** | ~100ms | Per document chunk |
-| **Vector Search** | < 500ms | Top-K retrieval from Astra DB |
-| **LLM Routing** | < 300ms | Groq inference time |
-| **Concurrent Users** | 50+ | Tested on Streamlit Cloud |
-
----
-
-## 🛠️ Technology Stack
-
-### Core Framework
-- **[Streamlit](https://streamlit.io/)** - Interactive web application framework
-- **[LangChain](https://langchain.com/)** - LLM application framework
-- **[LangGraph](https://github.com/langchain-ai/langgraph)** - Stateful workflow orchestration
-
-### AI/ML Components
-- **[Groq](https://groq.com/)** - High-performance LLM inference
-- **[HuggingFace Transformers](https://huggingface.co/)** - Sentence embeddings
-- **[DataStax Astra DB](https://astra.datastax.com)** - Vector database
-
-### Supporting Libraries
-- **Pydantic** - Data validation and settings management
-- **BeautifulSoup4** - Web scraping and HTML parsing
-- **TikToken** - Token counting and text splitting
-- **Wikipedia API** - External knowledge retrieval
-
----
-
-## 📈 Roadmap
-
-### Version 1.1 (Planned)
-- [ ] Multi-modal support (images, PDFs)
-- [ ] Advanced RAG techniques (HyDE, Multi-Query)
-- [ ] Custom document upload via UI
-- [ ] Export results to PDF/Markdown
-- [ ] User authentication & session management
-
-### Version 2.0 (Future)
-- [ ] Multi-language support
-- [ ] Graph RAG integration
-- [ ] Real-time collaborative features
-- [ ] API endpoints for programmatic access
-- [ ] Advanced analytics dashboard
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- LangChain team for the amazing framework
-- DataStax for Astra DB and Cassandra support
-- Groq for lightning-fast LLM inference
-- HuggingFace for open-source embeddings
-- Streamlit for the intuitive app framework
-
----
-
-## 📞 Contact & Support
-
-- **GitHub Issues**: [Report bugs or request features](https://github.com/KUNALSHAWW/IMSKOS/issues)
-- **Email**: kunalshawkol17@gmail.com
-- **LinkedIn**: [Profile](https://www.linkedin.com/in/kunal-kumar-shaw-443999205/)
-
----
-
-## 🌟 Star History
-
-If you find this project useful, please consider giving it a ⭐!
-
----
-
-<div align="center">
-
-**Built with ❤️ using LangGraph, Astra DB, and Groq**
-
-*Elevating Information Retrieval to Intelligence*
-
-</div>
-
-
-
+MIT, see [LICENSE](LICENSE).
