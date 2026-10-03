@@ -66,6 +66,20 @@ make eval-retrieval                                  # no LLM needed
 make eval PROVIDER=ollama MODEL=gemma4:e4b           # retrieval + end to end + injection (takes hours on CPU)
 ```
 
+## Deploying on a Hugging Face Space
+
+The workflow in [.github/workflows/sync_to_hub.yml](.github/workflows/sync_to_hub.yml) pushes `main` to the Space on every merge (it needs a write-access `HF_TOKEN` repository secret). In the Space, open **Settings, Variables and secrets** and add:
+
+| Kind | Name | Value |
+|---|---|---|
+| Secret | `OLLAMA_API_KEY` (or `GROQ_API_KEY`) | your key |
+| Variable | `IMSKOS_PROVIDER` | `ollama_cloud` (or `groq`) |
+| Variable | `IMSKOS_MODEL` | for example `gpt-oss:120b` |
+| Variable | `IMSKOS_EMBEDDING_MODEL` | optional; `hash` skips the model download and gives weaker retrieval |
+| Variable | `IMSKOS_SEED_URLS` | space-separated URLs to index on first start |
+
+The sidebar defaults come from these variables. The Space filesystem is ephemeral, so the seed URLs are re-indexed after each restart.
+
 ## Screenshots
 
 <table>
@@ -92,7 +106,7 @@ The interface is dark-first (near-black canvas, graphite surfaces, one indigo ac
 imskos/       graph, retrieval, store, embeddings, loaders, grounding check, sanitiser, API, CLI
   eval/       corpus loader, labelled questions, retrieval / end-to-end / injection runners
 app.py        Streamlit app
-tests/        66 tests (fake LLM and hash embedder, no network)
+tests/        68 tests (fake LLM and hash embedder, no network)
 docs/         ARCHITECTURE.md, BENCHMARKS.md
 ```
 

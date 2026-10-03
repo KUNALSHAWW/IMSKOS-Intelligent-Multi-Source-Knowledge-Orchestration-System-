@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from pathlib import Path
 
 import plotly.graph_objects as go
@@ -21,18 +23,33 @@ EXAMPLES = [
 ]
 
 
+PROVIDERS = ["groq", "openai", "ollama", "ollama_cloud"]
+PROVIDER_NAMES = {"groq": "Groq", "openai": "OpenAI", "ollama": "Ollama (local)", "ollama_cloud": "Ollama Cloud"}
+
+
 @st.cache_resource(show_spinner="Loading models...")
 def get_engine(provider: str, model: str, mode: str, grade: bool, verify: bool, defense: bool, web: bool) -> Engine:
-    return Engine(Settings.from_env(provider=provider, model=model, retrieval_mode=mode, grade=grade,
-                                    verify=verify, defense=defense, web_fallback=web))
+    engine = Engine(Settings.from_env(provider=provider, model=model, retrieval_mode=mode, grade=grade,
+                                      verify=verify, defense=defense, web_fallback=web))
+    # Optional first-run seeding, for hosts such as Hugging Face Spaces that start with an empty store:
+    # IMSKOS_SEED_URLS="https://a.example/x https://b.example/y"
+    if engine.store.count() == 0:
+        for url in re.split(r"[\s,]+", os.getenv("IMSKOS_SEED_URLS", "").strip()):
+            if url:
+                try:
+                    engine.ingest_url(url)
+                except Exception as e:  # a dead link must not stop the app from starting
+                    print(f"seed failed for {url}: {e}")
+    return engine
 
 
 with st.sidebar:
     st.markdown("### IMSKOS")
     st.caption("Agentic RAG that grades, verifies and abstains.")
-    provider = st.selectbox("LLM provider", ["groq", "openai", "ollama", "ollama_cloud"],
-                            format_func=lambda p: {"groq": "Groq", "openai": "OpenAI", "ollama": "Ollama (local)", "ollama_cloud": "Ollama Cloud"}[p])
-    model = st.text_input("Model (blank for default)", "")
+    env_provider = Settings.from_env().provider
+    provider = st.selectbox("LLM provider", PROVIDERS, index=PROVIDERS.index(env_provider) if env_provider in PROVIDERS else 0,
+                            format_func=PROVIDER_NAMES.get)
+    model = st.text_input("Model (blank for default)", os.getenv("IMSKOS_MODEL", ""))
     mode = st.selectbox("Retrieval", ["hybrid", "dense", "bm25"])
     st.markdown("**Agent behaviour**")
     grade = st.toggle("Grade retrieved passages", True)
