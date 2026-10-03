@@ -1,8 +1,8 @@
 name: Sync to Hugging Face Space
 
 # GitHub is the source of truth. The Space gets a copy of main with Space metadata added to the README
-# and without binary screenshots (Spaces reject non-LFS binaries). It is force-pushed, so there is
-# never a rebase against the Space's own history.
+# and without binary screenshots. Spaces reject binary files anywhere in the pushed history, so the copy
+# is a single fresh commit. It is force-pushed, so there is never a rebase against the Space's history.
 on:
   push:
     branches: [main]
@@ -13,18 +13,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Prepare the Space copy
+      - name: Prepare a single-commit copy for the Space
         run: |
+          git checkout --orphan space-deploy
+          git rm -r -q -f docs/screenshots
           printf '%s\n' '---' 'title: IMSKOS' 'emoji: 🧭' 'colorFrom: indigo' 'colorTo: blue' \
             'sdk: streamlit' 'sdk_version: 1.53.1' 'app_file: app.py' 'pinned: false' 'license: mit' '---' '' > /tmp/front.md
           cat /tmp/front.md README.md > /tmp/README.md
           mv /tmp/README.md README.md
-          git rm -r -q --cached docs/screenshots
+          git add -A
           git -c user.name="KUNAL SHAW" -c user.email="kunalshawkol16@gmail.com" \
-            commit -q -am "Deploy to Hugging Face Space"
+            commit -q -m "Deploy to Hugging Face Space"
+          echo "tracked binary files: $(git ls-files | grep -ciE '\.(png|jpe?g|gif|pdf|ico|zip)$' || true)"
 
       - name: Push to the Space
         env:
