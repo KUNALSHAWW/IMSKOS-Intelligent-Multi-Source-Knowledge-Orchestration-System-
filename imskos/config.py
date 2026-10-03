@@ -8,6 +8,7 @@ _PROVIDERS = {
     "groq": ("https://api.groq.com/openai/v1", "llama-3.1-8b-instant", "GROQ_API_KEY"),
     "openai": ("https://api.openai.com/v1", "gpt-4o-mini", "OPENAI_API_KEY"),
     "ollama": ("http://localhost:11434", "gemma4:e4b", ""),
+    "ollama_cloud": ("https://ollama.com", "gpt-oss:120b", "OLLAMA_API_KEY"),
 }
 
 
@@ -39,6 +40,7 @@ class Settings:
     extra: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        self.provider = self.provider.lower().replace("-", "_")
         base, model, key_env = _PROVIDERS.get(self.provider, ("", "", ""))
         self.base_url = self.base_url or base
         self.model = self.model or model

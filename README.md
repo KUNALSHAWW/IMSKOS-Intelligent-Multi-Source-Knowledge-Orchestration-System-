@@ -53,6 +53,7 @@ Everything below comes from `benchmarks/results/*.json`, produced by `python -m 
 ```bash
 pip install -r requirements.txt && pip install -e .
 export GROQ_API_KEY=...                 # or: --provider ollama --model gemma4:e4b
+                                        # or hosted Ollama models: --provider ollama_cloud --model gpt-oss:120b (needs OLLAMA_API_KEY)
 python -m imskos ingest https://lilianweng.github.io/posts/2023-06-23-agent/
 python -m imskos ask "What does ANNOY use as its core data structure?" --trace
 streamlit run app.py
@@ -91,7 +92,7 @@ The interface is dark-first (near-black canvas, graphite surfaces, one indigo ac
 imskos/       graph, retrieval, store, embeddings, loaders, grounding check, sanitiser, API, CLI
   eval/       corpus loader, labelled questions, retrieval / end-to-end / injection runners
 app.py        Streamlit app
-tests/        62 tests (fake LLM and hash embedder, no network)
+tests/        66 tests (fake LLM and hash embedder, no network)
 docs/         ARCHITECTURE.md, BENCHMARKS.md
 ```
 

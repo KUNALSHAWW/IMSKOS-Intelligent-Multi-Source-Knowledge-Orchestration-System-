@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> None:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     def common(sp):
-        sp.add_argument("--provider", choices=["groq", "openai", "ollama"])
+        sp.add_argument("--provider", choices=["groq", "openai", "ollama", "ollama_cloud"])
         sp.add_argument("--model")
         sp.add_argument("--store-dir", dest="store_dir")
 
@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> None:
     sp.add_argument("--port", type=int, default=8000)
     sp = sub.add_parser("eval", help="run benchmark suites")
     sp.add_argument("suite", choices=["retrieval", "e2e", "injection", "all"])
-    sp.add_argument("--provider", default="ollama", choices=["groq", "openai", "ollama"])
+    sp.add_argument("--provider", default="ollama", choices=["groq", "openai", "ollama", "ollama_cloud"])
     sp.add_argument("--model", default="")
     sp.add_argument("--embedding-model", default=Settings().embedding_model)
     sp.add_argument("--router", default="evidence", choices=["evidence", "titles", "none"])
