@@ -23,8 +23,8 @@ dependencies = [
 [project.optional-dependencies]
 embeddings = ["sentence-transformers>=2.5"]
 api = ["fastapi>=0.110", "uvicorn>=0.29"]
-app = ["streamlit>=1.35"]
-dev = ["pytest>=8", "ruff>=0.4", "fastapi>=0.110", "uvicorn>=0.29", "streamlit>=1.35"]
+app = ["streamlit>=1.35", "plotly>=5.20"]
+dev = ["pytest>=8", "ruff>=0.4", "fastapi>=0.110", "uvicorn>=0.29", "streamlit>=1.35", "plotly>=5.20"]
 
 [project.scripts]
 imskos = "imskos.cli:main"
