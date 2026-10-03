@@ -31,6 +31,8 @@ wheels/
 .env
 *.json
 !package.json
+!imskos/eval/data/*.json
+!benchmarks/results/*.json
 cs23b1039@iiitr.ac.in-token.json
 *.sqlite
 .DS_Store

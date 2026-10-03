@@ -1,0 +1,299 @@
+{
+  "chunks": 165,
+  "chunk_chars": 900,
+  "overlap": 150,
+  "embedder": "sentence-transformers/all-MiniLM-L6-v2",
+  "reranker": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+  "questions": 30,
+  "modes": {
+    "dense": {
+      "hit@1": 0.7,
+      "hit@3": 0.867,
+      "hit@5": 0.933,
+      "hit@10": 1.0,
+      "mrr@10": 0.81,
+      "ndcg@10": 0.842,
+      "mrr_ci95": [
+        0.699,
+        0.908
+      ],
+      "latency_ms_p50": 19.9
+    },
+    "bm25": {
+      "hit@1": 0.767,
+      "hit@3": 0.967,
+      "hit@5": 1.0,
+      "hit@10": 1.0,
+      "mrr@10": 0.868,
+      "ndcg@10": 0.897,
+      "mrr_ci95": [
+        0.78,
+        0.95
+      ],
+      "latency_ms_p50": 0.5
+    },
+    "hybrid": {
+      "hit@1": 0.767,
+      "hit@3": 1.0,
+      "hit@5": 1.0,
+      "hit@10": 1.0,
+      "mrr@10": 0.878,
+      "ndcg@10": 0.891,
+      "mrr_ci95": [
+        0.794,
+        0.95
+      ],
+      "latency_ms_p50": 15.7
+    },
+    "hybrid+rerank": {
+      "hit@1": 0.967,
+      "hit@3": 1.0,
+      "hit@5": 1.0,
+      "hit@10": 1.0,
+      "mrr@10": 0.983,
+      "ndcg@10": 0.977,
+      "mrr_ci95": [
+        0.95,
+        1.0
+      ],
+      "latency_ms_p50": 2083.6
+    }
+  },
+  "per_question": {
+    "a01": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a02": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a03": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a04": {
+      "dense": 4,
+      "bm25": 1,
+      "hybrid": 2,
+      "hybrid+rerank": 1
+    },
+    "a05": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a06": {
+      "dense": 2,
+      "bm25": 1,
+      "hybrid": 2,
+      "hybrid+rerank": 1
+    },
+    "a07": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a08": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a09": {
+      "dense": 1,
+      "bm25": 2,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a10": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a11": {
+      "dense": 2,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a12": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a13": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a14": {
+      "dense": 2,
+      "bm25": 2,
+      "hybrid": 2,
+      "hybrid+rerank": 2
+    },
+    "a15": {
+      "dense": 6,
+      "bm25": 1,
+      "hybrid": 2,
+      "hybrid+rerank": 1
+    },
+    "a16": {
+      "dense": 1,
+      "bm25": 2,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a17": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a18": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a19": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a20": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a21": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a22": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a23": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a24": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a25": {
+      "dense": 4,
+      "bm25": 3,
+      "hybrid": 3,
+      "hybrid+rerank": 1
+    },
+    "a26": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a27": {
+      "dense": 2,
+      "bm25": 2,
+      "hybrid": 2,
+      "hybrid+rerank": 1
+    },
+    "a28": {
+      "dense": 1,
+      "bm25": 1,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    },
+    "a29": {
+      "dense": 8,
+      "bm25": 2,
+      "hybrid": 2,
+      "hybrid+rerank": 1
+    },
+    "a30": {
+      "dense": 2,
+      "bm25": 5,
+      "hybrid": 1,
+      "hybrid+rerank": 1
+    }
+  },
+  "sweep": [
+    {
+      "chunk_chars": 500,
+      "overlap": 80,
+      "chunks": 295,
+      "hit@1": 0.8,
+      "hit@3": 0.967,
+      "hit@5": 1.0,
+      "hit@10": 1.0,
+      "mrr@10": 0.892,
+      "ndcg@10": 0.916,
+      "mrr_ci95": [
+        0.808,
+        0.967
+      ],
+      "latency_ms_p50": 20.9
+    },
+    {
+      "chunk_chars": 900,
+      "overlap": 150,
+      "chunks": 165,
+      "hit@1": 0.767,
+      "hit@3": 1.0,
+      "hit@5": 1.0,
+      "hit@10": 1.0,
+      "mrr@10": 0.878,
+      "ndcg@10": 0.891,
+      "mrr_ci95": [
+        0.794,
+        0.95
+      ],
+      "latency_ms_p50": 28.3
+    },
+    {
+      "chunk_chars": 1500,
+      "overlap": 250,
+      "chunks": 99,
+      "hit@1": 0.633,
+      "hit@3": 0.933,
+      "hit@5": 0.933,
+      "hit@10": 0.967,
+      "mrr@10": 0.782,
+      "ndcg@10": 0.814,
+      "mrr_ci95": [
+        0.669,
+        0.894
+      ],
+      "latency_ms_p50": 24.7
+    }
+  ],
+  "corpus_sha256": {
+    "https://lilianweng.github.io/posts/2023-06-23-agent/": "e7b5f008efd2cb18d49b93c104343d2ee8652baf22b4d4eb9238a5ceb6e6095e",
+    "https://lilianweng.github.io/posts/2023-03-15-prompt-engineering/": "2f6bc1c82b2f6eb2a46951c4379dbe413e795c257dd9fc9cd337fb8560f3b9f3",
+    "https://lilianweng.github.io/posts/2023-10-25-adv-attack-llm/": "ea7335e263e6ea5994949e94ae321c03bd654f4fe4e80f3f70bb0092acca47d8"
+  }
+}
