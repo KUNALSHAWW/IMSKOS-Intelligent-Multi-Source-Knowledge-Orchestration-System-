@@ -30,7 +30,8 @@ def get_engine(provider: str, model: str, mode: str, grade: bool, verify: bool, 
 with st.sidebar:
     st.markdown("### IMSKOS")
     st.caption("Agentic RAG that grades, verifies and abstains.")
-    provider = st.selectbox("LLM provider", ["groq", "openai", "ollama"], format_func=lambda p: {"groq": "Groq", "openai": "OpenAI", "ollama": "Ollama (local)"}[p])
+    provider = st.selectbox("LLM provider", ["groq", "openai", "ollama", "ollama_cloud"],
+                            format_func=lambda p: {"groq": "Groq", "openai": "OpenAI", "ollama": "Ollama (local)", "ollama_cloud": "Ollama Cloud"}[p])
     model = st.text_input("Model (blank for default)", "")
     mode = st.selectbox("Retrieval", ["hybrid", "dense", "bm25"])
     st.markdown("**Agent behaviour**")
